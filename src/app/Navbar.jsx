@@ -3,15 +3,16 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Home, Package, Users, CreditCard, User, LogOut, Menu, ChevronDown } from "lucide-react"
-import Image from "next/image"
 import Link from "next/link"
 import { Button } from "../components/components/ui/button"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../components/components/ui/dropdown-menu"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../components/components/ui/dropdown-menu"
 
 import { Sheet, SheetContent, SheetTrigger } from "../components/components/ui/sheet"
-
-
-
 
 export default function Navbar() {
   const [rol, setRol] = useState("")
@@ -69,9 +70,14 @@ export default function Navbar() {
       </NavLink>
       {rol === "admin" && (
         <>
-          <NavLink href="/Usuarios" icon={Users}>
-            Gestión de Usuarios
-          </NavLink>
+          <SubMenu
+            title="Gestión de Usuarios"
+            icon={Users}
+            items={[
+              { href: "/Usuarios", icon: Users, title: "Gestión de Usuarios" },
+              { href: "/UsuariosCliente", icon: User, title: "Gestión de Clientes" },
+            ]}
+          />
           <NavLink href="/Cargas" icon={Package}>
             Gestión de Carga de Agua
           </NavLink>
@@ -80,9 +86,6 @@ export default function Navbar() {
           </NavLink>
           <NavLink href="/Dashboard" icon={CreditCard}>
             Reportes
-          </NavLink>
-          <NavLink href="/PagosUsuario" icon={CreditCard}>
-            PAGOS2
           </NavLink>
         </>
       )}
@@ -165,4 +168,3 @@ export default function Navbar() {
     </nav>
   )
 }
-

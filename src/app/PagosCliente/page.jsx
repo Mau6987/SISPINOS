@@ -107,7 +107,7 @@ export default function OwnerPaymentsTable() {
 
   return (
     <div className="container mx-auto px-4 pt-20 pb-8">
-      <h1 className="text-3xl font-bold mb-8 text-center">Pagos del Propietario y Conductores</h1>
+      <h1 className="text-3xl font-bold mb-8 text-center">Pagos del Propietario</h1>
       <div className="flex justify-end items-center mb-6">
         <Button onClick={() => setShowFilterDialog(true)}>
           <Filter className="mr-2 h-4 w-4" /> Filtrar por Fecha

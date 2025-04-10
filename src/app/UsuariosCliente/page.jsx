@@ -147,11 +147,15 @@ export default function ClientManagement() {
   }
 
   const handleConsultas = (user) => {
-    router.push(`/Consultas/${user.id}`)
+    // Guardar el ID del usuario seleccionado en localStorage
+    localStorage.setItem("selectedUserId", user.id.toString())
+    router.push("/Consultas")
   }
 
   const handlePagos = (user) => {
-    router.push(`/PagosUsuario/${user.id}`)
+    // Guardar el ID del usuario seleccionado en localStorage
+    localStorage.setItem("selectedUserId", user.id.toString())
+    router.push("/PagosUsuario")
   }
 
   const indexOfLastUser = currentPage * usersPerPage
@@ -304,4 +308,3 @@ export default function ClientManagement() {
     </div>
   )
 }
-

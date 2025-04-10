@@ -12,8 +12,6 @@ const withPWAConfig = withPWA({
   aggressiveFrontEndNavCaching: true,
   reloadOnOnline: true,
   swcMinify: true,
-  fallbacks: {
-    document: '/offline', },
   runtimeCaching: [
     {urlPattern: /\.(?:css|js|woff|woff2|eot|ttf|otf)$/i,
       handler: 'CacheFirst',

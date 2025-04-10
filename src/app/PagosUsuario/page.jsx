@@ -43,10 +43,11 @@ export default function UsuarioDetalles() {
   // Estados para el usuario
   const [usuarios, setUsuarios] = useState([])
   const [usuarioSeleccionado, setUsuarioSeleccionado] = useState(null)
-  const [mostrarSelect, setMostrarSelect] = useState(true)
+  const [mostrarSelect, setMostrarSelect] = useState(false) // Cambiado a false por defecto
   const [conductores, setConductores] = useState([])
   const [conductorSeleccionado, setConductorSeleccionado] = useState(null)
   const [activeTab, setActiveTab] = useState("propietario")
+  const [autoLoadUserId, setAutoLoadUserId] = useState(null)
 
   // Estados para las cargas
   const [cargas, setCargas] = useState([])
@@ -88,8 +89,30 @@ export default function UsuarioDetalles() {
       router.push("/")
     } else {
       fetchUsuarios()
+
+      // Obtener el ID del usuario desde localStorage
+      const selectedUserId = localStorage.getItem("selectedUserId")
+
+      // Si hay un ID de usuario en localStorage, cargarlo automáticamente
+      if (selectedUserId) {
+        setAutoLoadUserId(selectedUserId)
+        // No eliminamos el ID para mantener la selección entre visitas
+      } else {
+        // Si no hay ID en localStorage, mostrar el select
+        setMostrarSelect(true)
+      }
     }
   }, [router])
+
+  useEffect(() => {
+    if (autoLoadUserId && usuarios.length > 0) {
+      const user = usuarios.find((u) => u.id.toString() === autoLoadUserId.toString())
+      if (user) {
+        handleUsuarioChange(user.id.toString())
+        setAutoLoadUserId(null) // Clear it after use
+      }
+    }
+  }, [usuarios, autoLoadUserId])
 
   const fetchUsuarios = async () => {
     try {
@@ -170,16 +193,17 @@ export default function UsuarioDetalles() {
     setUsuarioSeleccionado(usuario)
     setMostrarSelect(false)
 
-    // Si es propietario, cargar sus conductores
+    // If it's a property owner, load their drivers
     if (usuario.rol === "propietario") {
       await fetchConductores(usuario.id)
       setActiveTab("propietario")
 
-      // Cargar todas las cargas (propietario + conductores)
+      // Load all charges (owner + drivers) - this single call will update all necessary states
       await fetchTodasLasCargas(usuario.id)
 
-      // No es necesario llamar a fetchCargasUsuario ya que fetchTodasLasCargas ya actualiza los estados
+      // Don't call fetchCargasUsuario since fetchTodasLasCargas already updates the states
     } else {
+      // For non-owners, just fetch their charges directly
       await fetchCargasUsuario(id)
     }
   }
@@ -195,16 +219,18 @@ export default function UsuarioDetalles() {
         },
       )
 
-      let todasCargas = []
+      // Usar un Map para evitar duplicados, usando el ID como clave
+      const cargasMap = new Map()
 
       if (responsePropietario.ok) {
         const cargasPropietario = await responsePropietario.json()
         // Añadir información para identificar que estas cargas son del propietario
-        const cargasConInfo = cargasPropietario.map((carga) => ({
-          ...carga,
-          tipoCuenta: "propietario",
-        }))
-        todasCargas = [...cargasConInfo]
+        cargasPropietario.forEach((carga) => {
+          cargasMap.set(carga.id, {
+            ...carga,
+            tipoCuenta: "propietario",
+          })
+        })
       }
 
       // Luego obtenemos los conductores del propietario
@@ -230,18 +256,23 @@ export default function UsuarioDetalles() {
           if (responseConductor.ok) {
             const cargasConductor = await responseConductor.json()
             // Añadir información del conductor a cada carga
-            const cargasConInfo = cargasConductor.map((carga) => ({
-              ...carga,
-              tipoCuenta: "conductor",
-              conductorNombre: conductor.nombre,
-              conductorId: conductor.id,
-            }))
-            todasCargas = [...todasCargas, ...cargasConInfo]
+            cargasConductor.forEach((carga) => {
+              // Solo añadir si no existe ya en el Map
+              if (!cargasMap.has(carga.id)) {
+                cargasMap.set(carga.id, {
+                  ...carga,
+                  tipoCuenta: "conductor",
+                  conductorNombre: conductor.nombre,
+                  conductorId: conductor.id,
+                })
+              }
+            })
           }
         }
       }
 
-      // Ordenar por fecha (más antiguas primero)
+      // Convertir el Map a un array y ordenar por fecha
+      const todasCargas = Array.from(cargasMap.values())
       todasCargas.sort((a, b) => new Date(a.fechaHora) - new Date(b.fechaHora))
 
       // Actualizar los estados con todas las cargas combinadas
@@ -281,7 +312,7 @@ export default function UsuarioDetalles() {
 
     if (value === "propietario") {
       setConductorSeleccionado(null)
-      // Mostrar todas las cargas combinadas en lugar de solo las del propietario
+      // Use the already loaded data instead of fetching again
       setCargas(todasLasCargas)
       setTotalCargas(totalTodasCargas)
       setCargasDeuda(todasLasCargasDeuda)
@@ -291,17 +322,9 @@ export default function UsuarioDetalles() {
     }
   }
 
+  // Modificar la función handleCambiarUsuario para redirigir a /UsuariosCliente
   const handleCambiarUsuario = () => {
-    setUsuarioSeleccionado(null)
-    setConductorSeleccionado(null)
-    setConductores([])
-    setMostrarSelect(true)
-    setCargas([])
-    setCargasDeuda([])
-    setTotalCargas(0)
-    setTotalDeuda(0)
-    setMontoTotal(0)
-    setNumeroCargasAPagar(1)
+    router.push("/UsuariosCliente")
   }
 
   const handleNumeroCargasChange = (e) => {
@@ -446,357 +469,319 @@ export default function UsuarioDetalles() {
     <div className="container mx-auto px-4 py-8 mt-16">
       <h1 className="text-2xl font-bold mb-6">Pago por usuario</h1>
 
-      {mostrarSelect ? (
+      <>
         <Card className="mb-6 shadow-md">
-          <CardHeader>
-            <CardTitle>Seleccionar Usuario</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Información del Usuario</CardTitle>
+            <Button variant="outline" onClick={handleCambiarUsuario}>
+              Cambiar Usuario
+            </Button>
           </CardHeader>
           <CardContent>
-            <Select onValueChange={handleUsuarioChange}>
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccione un usuario" />
-              </SelectTrigger>
-              <SelectContent>
-                {usuarios.map((usuario) => (
-                  <SelectItem key={usuario.id} value={usuario.id.toString()}>
-                    {usuario.nombre} ({usuario.rol})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          <Card className="mb-6 shadow-md">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Información del Usuario</CardTitle>
-              <Button variant="outline" onClick={handleCambiarUsuario}>
-                Cambiar Usuario
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col md:flex-row gap-6">
-                <div className="flex flex-col items-center">
-                  <Avatar className="h-24 w-24 mb-2">
+            <div className="flex flex-col md:flex-row gap-6">
+              {/* Columna izquierda: Información del usuario */}
+              <div className="md:w-1/2">
+                <div className="flex items-start gap-4">
+                  <Avatar className="h-24 w-24">
                     <AvatarImage src="/placeholder.svg?height=96&width=96" alt={usuarioSeleccionado?.nombre} />
-                    <AvatarFallback className="text-2xl">{getInitials(usuarioSeleccionado?.nombre)}</AvatarFallback>
+                    <AvatarFallback className="text-2xl bg-gray-100">
+                      {getInitials(usuarioSeleccionado?.nombre)}
+                    </AvatarFallback>
                   </Avatar>
-                  <Badge className="mt-2">{usuarioSeleccionado?.rol}</Badge>
-                </div>
-
-                <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500">Nombre</h3>
-                    <p className="text-lg">{usuarioSeleccionado?.nombre}</p>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500">Correo</h3>
-                    <p className="text-lg">{usuarioSeleccionado?.correo || "No disponible"}</p>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500">CI</h3>
-                    <p className="text-lg">{usuarioSeleccionado?.ci || "No disponible"}</p>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500">Rol</h3>
-                    <p className="text-lg capitalize">{usuarioSeleccionado?.rol}</p>
+                  <div className="flex-1">
+                    <div className="mb-4">
+                      <h3 className="text-sm font-medium text-gray-500">Nombre</h3>
+                      <p className="text-lg">{usuarioSeleccionado?.nombre}</p>
+                    </div>
+                    <div className="mb-4">
+                      <h3 className="text-sm font-medium text-gray-500">Correo</h3>
+                      <p className="text-lg">{usuarioSeleccionado?.correo || "No disponible"}</p>
+                    </div>
+                    <div className="mb-4">
+                      <h3 className="text-sm font-medium text-gray-500">CI</h3>
+                      <p className="text-lg">{usuarioSeleccionado?.ci || "No disponible"}</p>
+                    </div>
+                   
+                    <Badge className="mt-1">{usuarioSeleccionado?.rol}</Badge>
                   </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
 
-          {usuarioSeleccionado?.rol === "propietario" && (
-            <Tabs value={activeTab} onValueChange={handleTabChange} className="mb-6">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="propietario">Cargas del Propietario</TabsTrigger>
-                <TabsTrigger value="conductores">Cargas de Conductores</TabsTrigger>
-              </TabsList>
+              {/* Columna derecha: Resumen de cargas */}
+              <div className="md:w-1/2">
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+                    <h4 className="text-sm font-medium text-gray-500">Total de Cargas</h4>
+                    <div className="flex items-center mt-2">
+                      <Calendar className="h-5 w-5 mr-2 text-gray-900" />
+                      <span className="text-2xl font-bold">{totalCargas}</span>
+                    </div>
+                  </div>
 
-              <TabsContent value="propietario">
-                {/* Contenido para cargas del propietario */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                  <Card className="shadow-md">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-lg">Total de Cargas</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center">
-                        <Calendar className="h-6 w-6 mr-2 text-gray-900" />
-                        <span className="text-3xl font-bold">{totalCargas}</span>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+                    <h4 className="text-sm font-medium text-gray-500">Cargas con Deuda</h4>
+                    <div className="flex items-center mt-2">
+                      <CreditCard className="h-5 w-5 mr-2 text-amber-600" />
+                      <span className="text-2xl font-bold">{cargasDeuda.length}</span>
+                    </div>
+                  </div>
 
-                  <Card className="shadow-md">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-lg">Cargas con Deuda</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center">
-                        <CreditCard className="h-6 w-6 mr-2 text-amber-600" />
-                        <span className="text-3xl font-bold">{cargasDeuda.length}</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="shadow-md">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-lg">Total Deuda</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center">
-                        <DollarSign className="h-6 w-6 mr-2 text-red-600" />
-                        <span className="text-3xl font-bold">Bs{totalDeuda}</span>
-                      </div>
-                    </CardContent>
-                    <CardFooter>
-                      <Button
-                        className="w-full bg-gray-900 hover:bg-gray-800 text-white"
-                        onClick={() => setShowPaymentDialog(true)}
-                        disabled={cargasDeuda.length === 0}
-                      >
-                        Pagar Deudas
-                      </Button>
-                    </CardFooter>
-                  </Card>
+                  <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+                    <h4 className="text-sm font-medium text-gray-500">Total Deuda</h4>
+                    <div className="flex items-center mt-2">
+                      <DollarSign className="h-5 w-5 mr-2 text-red-600" />
+                      <span className="text-2xl font-bold">Bs{totalDeuda}</span>
+                    </div>
+                    <Button
+                      className="w-full mt-3 bg-gray-900 hover:bg-gray-800 text-white"
+                      onClick={() => setShowPaymentDialog(true)}
+                      disabled={cargasDeuda.length === 0}
+                    >
+                      Pagar Deudas
+                    </Button>
+                  </div>
                 </div>
-              </TabsContent>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-              <TabsContent value="conductores">
-                {/* Selector de conductor y sus cargas */}
-                <Card className="mb-6 shadow-md">
-                  <CardHeader>
-                    <CardTitle>Seleccionar Conductor</CardTitle>
+        {usuarioSeleccionado?.rol === "propietario" && (
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="mb-6">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="propietario">Cargas del Propietario</TabsTrigger>
+              <TabsTrigger value="conductores">Cargas de Conductores</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="propietario">
+              {/* Contenido vacío ya que el resumen ahora está en la tarjeta de información del usuario */}
+            </TabsContent>
+
+            <TabsContent value="conductores">
+              {/* Selector de conductor y sus cargas */}
+              <Card className="mb-6 shadow-md">
+                <CardHeader>
+                  <CardTitle>Seleccionar Conductor</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {conductores.length === 0 ? (
+                    <p className="text-center py-4 text-gray-500">No hay conductores asociados a este propietario.</p>
+                  ) : (
+                    <Select onValueChange={handleConductorChange} value={conductorSeleccionado?.id?.toString()}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccione un conductor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {conductores.map((conductor) => (
+                          <SelectItem key={conductor.id} value={conductor.id.toString()}>
+                            {conductor.nombre}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </CardContent>
+              </Card>
+
+              {conductorSeleccionado && (
+                <Card className="shadow-md mb-6">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg">Resumen de Cargas - {conductorSeleccionado.nombre}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {conductores.length === 0 ? (
-                      <p className="text-center py-4 text-gray-500">No hay conductores asociados a este propietario.</p>
-                    ) : (
-                      <Select onValueChange={handleConductorChange} value={conductorSeleccionado?.id?.toString()}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccione un conductor" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {conductores.map((conductor) => (
-                            <SelectItem key={conductor.id} value={conductor.id.toString()}>
-                              {conductor.nombre}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {conductorSeleccionado && (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                    <Card className="shadow-md">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-lg">Total de Cargas</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex items-center">
-                          <Calendar className="h-6 w-6 mr-2 text-gray-900" />
-                          <span className="text-3xl font-bold">{totalCargas}</span>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="bg-white p-4 rounded-lg shadow-sm">
+                        <h4 className="text-sm font-medium text-gray-500">Total de Cargas</h4>
+                        <div className="flex items-center mt-2">
+                          <Calendar className="h-5 w-5 mr-2 text-gray-900" />
+                          <span className="text-2xl font-bold">{totalCargas}</span>
                         </div>
-                      </CardContent>
-                    </Card>
+                      </div>
 
-                    <Card className="shadow-md">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-lg">Cargas con Deuda</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex items-center">
-                          <CreditCard className="h-6 w-6 mr-2 text-amber-600" />
-                          <span className="text-3xl font-bold">{cargasDeuda.length}</span>
+                      <div className="bg-white p-4 rounded-lg shadow-sm">
+                        <h4 className="text-sm font-medium text-gray-500">Cargas con Deuda</h4>
+                        <div className="flex items-center mt-2">
+                          <CreditCard className="h-5 w-5 mr-2 text-amber-600" />
+                          <span className="text-2xl font-bold">{cargasDeuda.length}</span>
                         </div>
-                      </CardContent>
-                    </Card>
+                      </div>
 
-                    <Card className="shadow-md">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-lg">Total Deuda</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex items-center">
-                          <DollarSign className="h-6 w-6 mr-2 text-red-600" />
-                          <span className="text-3xl font-bold">Bs{totalDeuda}</span>
+                      <div className="bg-white p-4 rounded-lg shadow-sm">
+                        <h4 className="text-sm font-medium text-gray-500">Total Deuda</h4>
+                        <div className="flex items-center mt-2">
+                          <DollarSign className="h-5 w-5 mr-2 text-red-600" />
+                          <span className="text-2xl font-bold">Bs{totalDeuda}</span>
                         </div>
-                      </CardContent>
-                      <CardFooter>
                         <Button
-                          className="w-full bg-gray-900 hover:bg-gray-800 text-white"
+                          className="w-full mt-3 bg-gray-900 hover:bg-gray-800 text-white"
                           onClick={() => setShowPaymentDialog(true)}
                           disabled={cargasDeuda.length === 0}
                         >
                           Pagar Deudas
                         </Button>
-                      </CardFooter>
-                    </Card>
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
-          )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+          </Tabs>
+        )}
 
-          <Card className="mb-6 shadow-md">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>
-                {usuarioSeleccionado?.rol === "propietario" && activeTab === "conductores" && conductorSeleccionado
-                  ? `Historial de Cargas - {$conductorSeleccionado.nombre}`
-                  : usuarioSeleccionado?.rol === "propietario" && activeTab === "propietario"
-                    ? "Historial de Cargas (Propietario + Conductores)"
-                    : "Historial de Cargas"}
-              </CardTitle>
-              <Button variant="outline" onClick={() => setShowFilterDialog(true)}>
-                <Filter className="h-4 w-4 mr-2" /> {filtrosActivos ? "Filtros Activos" : "Filtros"}
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {cargasFiltradas.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  No hay cargas para mostrar con los filtros seleccionados.
-                </div>
-              ) : isMobile ? (
-                // Modificar la vista móvil para incluir el botón de pago y mostrar el usuario
-                <div className="space-y-4">
-                  {todasLasCargas.map((carga) => (
-                    <Card key={carga.id} className="shadow-sm hover:shadow-md transition-shadow duration-200">
-                      <CardContent className="p-4">
-                        <p>
-                          <strong>ID:</strong> {carga.id}
-                        </p>
-                        <p>
-                          <strong>Fecha:</strong> {new Date(carga.fechaHora).toLocaleString()}
-                        </p>
-                        <p>
-                          <strong>Estado:</strong>{" "}
-                          <Badge className={carga.estado === "deuda" ? "bg-red-500" : "bg-green-500"}>
-                            {carga.estado}
-                          </Badge>
-                        </p>
-                        <p>
-                          <strong>Costo:</strong> ${carga.costo || 30}
-                        </p>
-                        <p>
-                          <strong>Usuario:</strong> {carga.usuario?.nombre || carga.conductorNombre || "N/A"}
-                        </p>
-                        <p>
-                          <strong>Tipo:</strong>{" "}
-                          <Badge
-                            variant="outline"
-                            className={carga.tipoCuenta === "propietario" ? "bg-blue-100" : "bg-green-100"}
-                          >
-                            {carga.tipoCuenta === "propietario" ? "Propietario" : "Conductor"}
-                          </Badge>
-                        </p>
-                      </CardContent>
-                      <CardFooter className="flex justify-between">
+        <Card className="mb-6 shadow-md">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>
+              {usuarioSeleccionado?.rol === "propietario" && activeTab === "conductores" && conductorSeleccionado
+                ? `Historial de Cargas - ${conductorSeleccionado.nombre}`
+                : usuarioSeleccionado?.rol === "propietario" && activeTab === "propietario"
+                  ? "Historial de Cargas (Propietario + Conductores)"
+                  : "Historial de Cargas"}
+            </CardTitle>
+            <Button variant="outline" onClick={() => setShowFilterDialog(true)}>
+              <Filter className="h-4 w-4 mr-2" /> {filtrosActivos ? "Filtros Activos" : "Filtros"}
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {cargasFiltradas.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                No hay cargas para mostrar con los filtros seleccionados.
+              </div>
+            ) : isMobile ? (
+              // Modificar la vista móvil para incluir el botón de pago y mostrar el usuario
+              <div className="space-y-4">
+                {cargasFiltradas.map((carga) => (
+                  <Card key={carga.id} className="shadow-sm hover:shadow-md transition-shadow duration-200">
+                    <CardContent className="p-4">
+                      <p>
+                        <strong>ID:</strong> {carga.id}
+                      </p>
+                      <p>
+                        <strong>Fecha:</strong> {new Date(carga.fechaHora).toLocaleString()}
+                      </p>
+                      <p>
+                        <strong>Estado:</strong>{" "}
+                        <Badge className={carga.estado === "deuda" ? "bg-red-500" : "bg-green-500"}>
+                          {carga.estado}
+                        </Badge>
+                      </p>
+                      <p>
+                        <strong>Costo:</strong> Bs{carga.costo || 30}
+                      </p>
+                      <p>
+                        <strong>Usuario:</strong> {carga.usuario?.nombre || carga.conductorNombre || "N/A"}
+                      </p>
+                      <p>
+                        <strong>Tipo:</strong>{" "}
+                        <Badge
+                          variant="outline"
+                          className={carga.tipoCuenta === "propietario" ? "bg-blue-100" : "bg-green-100"}
+                        >
+                          {carga.tipoCuenta === "propietario" ? "Propietario" : "Conductor"}
+                        </Badge>
+                      </p>
+                    </CardContent>
+                    <CardFooter className="flex justify-between">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => fetchChargeDetails(carga.id)}
+                        className="bg-gray-900 hover:bg-gray-800 text-white border-gray-700"
+                      >
+                        Ver Detalles
+                      </Button>
+                      {carga.estado === "deuda" && (
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => fetchChargeDetails(carga.id)}
-                          className="bg-gray-900 hover:bg-gray-800 text-white border-gray-700"
+                          onClick={() => {
+                            // Configurar para pagar esta carga específica
+                            const usuarioIdPago =
+                              carga.tipoCuenta === "conductor" ? carga.conductorId : usuarioSeleccionado.id
+
+                            // Configurar los estados para el pago
+                            setCargasDeuda([carga])
+                            setNumeroCargasAPagar(1)
+                            setMontoTotal(carga.costo || 30)
+
+                            // Si es un conductor, actualizar temporalmente el conductorSeleccionado
+                            if (carga.tipoCuenta === "conductor" && carga.conductorId) {
+                              const conductor = conductores.find((c) => c.id === carga.conductorId)
+                              if (conductor) {
+                                setConductorSeleccionado(conductor)
+                              }
+                            }
+
+                            setShowPaymentDialog(true)
+                          }}
+                          className="bg-red-600 hover:bg-red-700 text-white border-red-500"
                         >
-                          Ver Detalles
+                          Pagar
                         </Button>
-                        {carga.estado === "deuda" && (
+                      )}
+                    </CardFooter>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <Table>
+                <TableHeader className="bg-gray-900 border-b-2 border-gray-700 shadow-md">
+                  <TableRow>
+                    <TableHead className="font-bold text-gray-300 border-r border-gray-700">ID</TableHead>
+                    <TableHead className="font-bold text-gray-300 border-r border-gray-700">Fecha y Hora</TableHead>
+                    <TableHead className="font-bold text-gray-300 border-r border-gray-700">Estado</TableHead>
+                    <TableHead className="font-bold text-gray-300 border-r border-gray-700">Costo</TableHead>
+                    <TableHead className="font-bold text-gray-300 border-r border-gray-700">Usuario</TableHead>
+                    <TableHead className="font-bold text-gray-300">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {cargasFiltradas.map((carga) => (
+                    <TableRow key={carga.id}>
+                      <TableCell>{carga.id}</TableCell>
+                      <TableCell>{new Date(carga.fechaHora).toLocaleString()}</TableCell>
+                      <TableCell>
+                        <Badge className={carga.estado === "deuda" ? "bg-red-500" : "bg-green-500"}>
+                          {carga.estado}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>Bs{carga.costo || 30}</TableCell>
+                      <TableCell>{carga.usuario?.nombre || "N/A"}</TableCell>
+                      <TableCell>
+                        <div className="flex space-x-2">
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => {
-                              // Configurar para pagar esta carga específica
-                              const usuarioIdPago =
-                                carga.tipoCuenta === "conductor" ? carga.conductorId : usuarioSeleccionado.id
-
-                              // Configurar los estados para el pago
-                              setCargasDeuda([carga])
-                              setNumeroCargasAPagar(1)
-                              setMontoTotal(carga.costo || 30)
-
-                              // Si es un conductor, actualizar temporalmente el conductorSeleccionado
-                              if (carga.tipoCuenta === "conductor" && carga.conductorId) {
-                                const conductor = conductores.find((c) => c.id === carga.conductorId)
-                                if (conductor) {
-                                  setConductorSeleccionado(conductor)
-                                }
-                              }
-
-                              setShowPaymentDialog(true)
-                            }}
-                            className="bg-red-600 hover:bg-red-700 text-white border-red-500"
+                            onClick={() => fetchChargeDetails(carga.id)}
+                            className="bg-gray-900 hover:bg-gray-800 text-white border-gray-700"
                           >
-                            Pagar
+                            Ver Detalles
                           </Button>
-                        )}
-                      </CardFooter>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader className="bg-gray-900 border-b-2 border-gray-700 shadow-md">
-                    <TableRow>
-                      <TableHead className="font-bold text-gray-300 border-r border-gray-700">ID</TableHead>
-                      <TableHead className="font-bold text-gray-300 border-r border-gray-700">Fecha y Hora</TableHead>
-                      <TableHead className="font-bold text-gray-300 border-r border-gray-700">Estado</TableHead>
-                      <TableHead className="font-bold text-gray-300 border-r border-gray-700">Costo</TableHead>
-                      <TableHead className="font-bold text-gray-300 border-r border-gray-700">Usuario</TableHead>
-                      <TableHead className="font-bold text-gray-300">Acciones</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {cargasFiltradas.map((carga) => (
-                      <TableRow key={carga.id}>
-                        <TableCell>{carga.id}</TableCell>
-                        <TableCell>{new Date(carga.fechaHora).toLocaleString()}</TableCell>
-                        <TableCell>
-                          <Badge className={carga.estado === "deuda" ? "bg-red-500" : "bg-green-500"}>
-                            {carga.estado}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>${carga.costo || 30}</TableCell>
-                        <TableCell>{carga.usuario?.nombre || "N/A"}</TableCell>
-                        <TableCell>
-                          <div className="flex space-x-2">
+                          {carga.estado === "deuda" && (
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => fetchChargeDetails(carga.id)}
-                              className="bg-gray-900 hover:bg-gray-800 text-white border-gray-700"
+                              onClick={() => {
+                                // Configurar para pagar solo esta carga específica
+                                setCargasDeuda([carga])
+                                setNumeroCargasAPagar(1)
+                                setMontoTotal(carga.costo || 30)
+                                setShowPaymentDialog(true)
+                              }}
+                              className="bg-red-600 hover:bg-red-700 text-white border-red-500"
                             >
-                              Ver Detalles
+                              Pagar
                             </Button>
-                            {carga.estado === "deuda" && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  // Configurar para pagar solo esta carga específica
-                                  setCargasDeuda([carga])
-                                  setNumeroCargasAPagar(1)
-                                  setMontoTotal(carga.costo || 30)
-                                  setShowPaymentDialog(true)
-                                }}
-                                className="bg-red-600 hover:bg-red-700 text-white border-red-500"
-                              >
-                                Pagar
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </>
-      )}
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      </>
 
       {/* Diálogo de Pago */}
 
@@ -836,7 +821,7 @@ export default function UsuarioDetalles() {
             <div className="grid grid-cols-4 items-center gap-4">
               <Label className="text-right">Monto Total:</Label>
               <div className="col-span-3 flex items-center">
-                <Input value={`$${montoTotal}`} readOnly className="bg-gray-50" />
+                <Input value={`Bs${montoTotal}`} readOnly className="bg-gray-50" />
               </div>
             </div>
             {numeroCargasAPagar > 0 && (
@@ -849,7 +834,7 @@ export default function UsuarioDetalles() {
                         Carga #{carga.id} - {new Date(carga.fechaHora).toLocaleDateString()} -{" "}
                         {carga.usuario?.nombre || "N/A"}
                       </span>
-                      <span>${carga.costo || 30}</span>
+                      <span>Bs{carga.costo || 30}</span>
                     </div>
                   ))}
                 </div>
@@ -963,7 +948,7 @@ export default function UsuarioDetalles() {
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <span className="font-medium text-right">Costo:</span>
-                <span className="col-span-3">${selectedCharge.costo || 30}</span>
+                <span className="col-span-3">Bs{selectedCharge.costo || 30}</span>
               </div>
             </div>
           )}
@@ -975,4 +960,3 @@ export default function UsuarioDetalles() {
     </div>
   )
 }
-

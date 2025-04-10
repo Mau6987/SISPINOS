@@ -7,7 +7,8 @@ import { Eye, Truck, DollarSign } from "lucide-react"
 import { Button } from "../../components/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/components/ui/dialog"
-import { Card, CardContent, CardFooter } from "../../components/components/ui/card"
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "../../components/components/ui/card"
+import { Badge } from "../../components/components/ui/badge"
 
 const useWindowWidth = () => {
   const [windowWidth, setWindowWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 0)
@@ -33,11 +34,13 @@ export default function OwnerDriversTable() {
   const [selectedDriver, setSelectedDriver] = useState(null)
   const [charges, setCharges] = useState([])
   const [payments, setPayments] = useState([])
+  const [loading, setLoading] = useState(true)
 
   const router = useRouter()
 
   useEffect(() => {
     const fetchDrivers = async () => {
+      setLoading(true)
       const token = localStorage.getItem("token")
       const ownerId = localStorage.getItem("idUser")
       const url = `https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/conductores/${ownerId}`
@@ -55,6 +58,8 @@ export default function OwnerDriversTable() {
         }
       } catch (error) {
         console.error("Error fetching drivers:", error)
+      } finally {
+        setLoading(false)
       }
     }
 
@@ -67,6 +72,7 @@ export default function OwnerDriversTable() {
   }
 
   const handleViewCharges = async (driverId) => {
+    setLoading(true)
     const token = localStorage.getItem("token")
     const url = `https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/cargascliente/${driverId}`
 
@@ -82,10 +88,13 @@ export default function OwnerDriversTable() {
       }
     } catch (error) {
       console.error("Error fetching charges:", error)
+    } finally {
+      setLoading(false)
     }
   }
 
   const handleViewPayments = async (driverId) => {
+    setLoading(true)
     const token = localStorage.getItem("token")
     const url = `https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/pagoscliente/${driverId}`
 
@@ -101,6 +110,8 @@ export default function OwnerDriversTable() {
       }
     } catch (error) {
       console.error("Error fetching payments:", error)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -115,79 +126,80 @@ export default function OwnerDriversTable() {
   }
 
   const renderTable = () => (
-    <Table className="border border-gray-200">
-      <TableHeader className="bg-gray-300">
-        <TableRow>
-          <TableHead>Nombre</TableHead>
-          <TableHead>CI</TableHead>
-          <TableHead>Ver</TableHead>
-          <TableHead>Cargas Realizadas</TableHead>
-          <TableHead>Pagos Realizados</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {drivers.map((driver) => (
-          <TableRow key={driver.id}>
-            <TableCell>{driver.nombre}</TableCell>
-            <TableCell>{driver.ci}</TableCell>
-            <TableCell>
-              <Button
-                size="sm"
-                variant="outline"
-                className="text-blue-500 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
-                onClick={() => handleViewDriver(driver)}
-              >
-                <Eye className="h-4 w-4" />
-              </Button>
-            </TableCell>
-            <TableCell>
-              <Button
-                size="sm"
-                variant="outline"
-                className="text-green-500 hover:text-green-700 hover:bg-green-50 border-green-200"
-                onClick={() => handleViewCharges(driver.id)}
-              >
-                <Truck className="h-4 w-4" />
-              </Button>
-            </TableCell>
-            <TableCell>
-              <Button
-                size="sm"
-                variant="outline"
-                className="text-amber-500 hover:text-amber-700 hover:bg-amber-50 border-amber-200"
-                onClick={() => handleViewPayments(driver.id)}
-              >
-                <DollarSign className="h-4 w-4" />
-              </Button>
-            </TableCell>
+    <div className="border-[3px] border-gray-600 rounded-lg overflow-hidden shadow-xl">
+      <Table className="w-full border-collapse">
+        <TableHeader className="bg-gray-700">
+          <TableRow className="border-b-0">
+            <TableHead className="font-bold text-white py-4 border-0">Nombre</TableHead>
+            <TableHead className="font-bold text-white py-4 border-0">CI</TableHead>
+            <TableHead className="font-bold text-white py-4 border-0">Ver</TableHead>
+            <TableHead className="font-bold text-white py-4 border-0">Cargas Realizadas</TableHead>
+            <TableHead className="font-bold text-white py-4 border-0">Pagos Realizados</TableHead>
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody>
+          {drivers.map((driver) => (
+            <TableRow key={driver.id} className="border-0 hover:bg-gray-50">
+              <TableCell className="border-0 py-3">{driver.nombre}</TableCell>
+              <TableCell className="border-0 py-3">{driver.ci}</TableCell>
+              <TableCell className="border-0 py-3">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-blue-500 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
+                  onClick={() => handleViewDriver(driver)}
+                >
+                  <Eye className="h-4 w-4" />
+                </Button>
+              </TableCell>
+              <TableCell className="border-0 py-3">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-green-500 hover:text-green-700 hover:bg-green-50 border-green-200"
+                  onClick={() => handleViewCharges(driver.id)}
+                >
+                  <Truck className="h-4 w-4" />
+                </Button>
+              </TableCell>
+              <TableCell className="border-0 py-3">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-amber-500 hover:text-amber-700 hover:bg-amber-50 border-amber-200"
+                  onClick={() => handleViewPayments(driver.id)}
+                >
+                  <DollarSign className="h-4 w-4" />
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   )
 
   const renderCards = () => (
     <div className="space-y-4">
       {drivers.map((driver) => (
-        <Card key={driver.id} className="border border-gray-200">
-          <CardContent className="p-4 bg-gray-300">
+        <Card key={driver.id} className="border-2 border-gray-300 shadow-md">
+          <CardHeader className="bg-gray-700 text-white p-3">
+            <CardTitle className="text-lg">{driver.nombre}</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4">
             <div className="flex justify-between items-center mb-2">
-              <span className="font-bold">Nombre:</span>
-              <span>{driver.nombre}</span>
-            </div>
-            <div className="flex justify-between items-center">
               <span className="font-bold">CI:</span>
               <span>{driver.ci}</span>
             </div>
           </CardContent>
-          <CardFooter className="flex justify-around">
+          <CardFooter className="flex justify-around p-3 bg-gray-100">
             <Button
               size="sm"
               variant="outline"
               className="text-blue-500 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
               onClick={() => handleViewDriver(driver)}
             >
-              <Eye className="h-4 w-4 mr-2" /> Ver
+              <Eye className="h-4 w-4 mr-1" /> Ver
             </Button>
             <Button
               size="sm"
@@ -195,7 +207,7 @@ export default function OwnerDriversTable() {
               className="text-green-500 hover:text-green-700 hover:bg-green-50 border-green-200"
               onClick={() => handleViewCharges(driver.id)}
             >
-              <Truck className="h-4 w-4 mr-2" /> Cargas
+              <Truck className="h-4 w-4 mr-1" /> Cargas
             </Button>
             <Button
               size="sm"
@@ -203,7 +215,7 @@ export default function OwnerDriversTable() {
               className="text-amber-500 hover:text-amber-700 hover:bg-amber-50 border-amber-200"
               onClick={() => handleViewPayments(driver.id)}
             >
-              <DollarSign className="h-4 w-4 mr-2" /> Pagos
+              <DollarSign className="h-4 w-4 mr-1" /> Pagos
             </Button>
           </CardFooter>
         </Card>
@@ -213,14 +225,22 @@ export default function OwnerDriversTable() {
 
   return (
     <div className="container mx-auto px-4 pt-20 pb-8">
-      <h1 className="text-3xl font-bold mb-8 text-center">Conductores Asociados</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">Conductores Asociados</h1>
+      </div>
 
-      {isMobile ? renderCards() : renderTable()}
+      {loading ? (
+        <div className="flex justify-center items-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+        </div>
+      ) : (
+        <>{isMobile ? renderCards() : renderTable()}</>
+      )}
 
       <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Detalles del Conductor</DialogTitle>
+            <DialogTitle className="text-blue-700">Detalles del Conductor</DialogTitle>
           </DialogHeader>
           {selectedDriver && (
             <div className="grid gap-4 py-4">
@@ -242,65 +262,72 @@ export default function OwnerDriversTable() {
       </Dialog>
 
       <Dialog open={showChargesDialog} onOpenChange={setShowChargesDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Cargas Realizadas</DialogTitle>
+            <DialogTitle className="text-green-700">Cargas Realizadas</DialogTitle>
           </DialogHeader>
           {charges.length === 0 ? (
-            <p>No hay cargas realizadas por este usuario.</p>
+            <p className="text-center py-4 text-gray-500">No hay cargas realizadas por este usuario.</p>
           ) : (
-            <Table className="border border-gray-200">
-              <TableHeader className="bg-gray-300">
-                <TableRow>
-                  <TableHead>Fecha y Hora</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead>Nombre</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {charges.map((charge) => (
-                  <TableRow key={charge.id}>
-                    <TableCell>{formatDate(charge.fechaHora)}</TableCell>
-                    <TableCell>{charge.estado}</TableCell>
-                    <TableCell>{charge.usuario.nombre}</TableCell>
+            <div className="border-[2px] border-gray-600 rounded-lg overflow-hidden shadow-md">
+              <Table className="w-full border-collapse">
+                <TableHeader className="bg-gray-700">
+                  <TableRow className="border-b-0">
+                    <TableHead className="font-bold text-white py-3 border-0">Fecha y Hora</TableHead>
+                    <TableHead className="font-bold text-white py-3 border-0">Estado</TableHead>
+                    <TableHead className="font-bold text-white py-3 border-0">Nombre</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {charges.map((charge) => (
+                    <TableRow key={charge.id} className="border-0 hover:bg-gray-50">
+                      <TableCell className="border-0 py-2">{formatDate(charge.fechaHora)}</TableCell>
+                      <TableCell className="border-0 py-2">
+                        <Badge className={charge.estado === "deuda" ? "bg-red-500" : "bg-green-500"}>
+                          {charge.estado}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="border-0 py-2">{charge.usuario.nombre}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </DialogContent>
       </Dialog>
 
       <Dialog open={showPaymentsDialog} onOpenChange={setShowPaymentsDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Pagos Realizados</DialogTitle>
+            <DialogTitle className="text-amber-700">Pagos Realizados</DialogTitle>
           </DialogHeader>
           {payments.length === 0 ? (
-            <p>No hay pagos realizados por este usuario.</p>
+            <p className="text-center py-4 text-gray-500">No hay pagos realizados por este usuario.</p>
           ) : (
-            <Table className="border border-gray-200">
-              <TableHeader className="bg-gray-300">
-                <TableRow>
-                  <TableHead>Fecha y Hora</TableHead>
-                  <TableHead>Monto</TableHead>
-                  <TableHead>Nombre</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {payments.map((payment) => (
-                  <TableRow key={payment.id}>
-                    <TableCell>{formatDate(payment.fechaHora)}</TableCell>
-                    <TableCell>{payment.monto}</TableCell>
-                    <TableCell>{payment.usuario.nombre}</TableCell>
+            <div className="border-[2px] border-gray-600 rounded-lg overflow-hidden shadow-md">
+              <Table className="w-full border-collapse">
+                <TableHeader className="bg-gray-700">
+                  <TableRow className="border-b-0">
+                    <TableHead className="font-bold text-white py-3 border-0">Fecha y Hora</TableHead>
+                    <TableHead className="font-bold text-white py-3 border-0">Monto</TableHead>
+                    <TableHead className="font-bold text-white py-3 border-0">Nombre</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {payments.map((payment) => (
+                    <TableRow key={payment.id} className="border-0 hover:bg-gray-50">
+                      <TableCell className="border-0 py-2">{formatDate(payment.fechaHora)}</TableCell>
+                      <TableCell className="border-0 py-2">Bs {payment.monto}</TableCell>
+                      <TableCell className="border-0 py-2">{payment.usuario.nombre}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </DialogContent>
       </Dialog>
     </div>
   )
 }
-

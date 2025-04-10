@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { ChevronLeft, ChevronRight, Eye, Filter, Calendar, CreditCard } from "lucide-react"
+import { ChevronLeft, ChevronRight, Eye, Filter, CreditCard, Droplet } from "lucide-react"
 
 import { Button } from "../../components/components/ui/button"
 import { Input } from "../../components/components/ui/input"
@@ -237,7 +237,7 @@ export default function WaterChargesClient() {
                 </div>
                 <div className="border border-t-0 border-blue-200 rounded-b-md p-3">
                   <div className="flex items-center justify-center gap-2">
-                    <Calendar className="h-5 w-5 text-blue-600" />
+                    <Droplet className="h-5 w-5 text-blue-600" />
                     <p className="text-2xl font-bold">{summary.totalCargas}</p>
                   </div>
                   <p className="text-sm text-gray-500 mt-1">Bs {summary.montoPagadas + summary.montoDeuda}</p>
@@ -282,47 +282,50 @@ export default function WaterChargesClient() {
         </div>
       ) : (
         <>
-          <Table className="border border-gray-200 rounded-lg overflow-hidden">
-            <TableHeader className="bg-gray-700">
-              <TableRow>
-                <TableHead className="font-bold text-white">Fecha y Hora</TableHead>
-                <TableHead className="font-bold text-white">Estado</TableHead>
-                <TableHead className="font-bold text-white">Nombre de Usuario</TableHead>
-                <TableHead className="font-bold text-white">Costo</TableHead>
-                <TableHead className="font-bold text-white">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {currentItems.length > 0 ? (
-                currentItems.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell>{formatDate(item.fechaHora)}</TableCell>
-                    <TableCell>
-                      <Badge className={item.estado === "deuda" ? "bg-red-500" : "bg-green-500"}>{item.estado}</Badge>
-                    </TableCell>
-                    <TableCell>{item.usuario?.nombre || "N/A"}</TableCell>
-                    <TableCell>Bs {item.costo || 30}</TableCell>
-                    <TableCell>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-blue-500 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
-                        onClick={() => handleViewDetails(item)}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
+          {/* Tabla con borde exterior más definido */}
+          <div className="border-[3px] border-gray-600 rounded-lg overflow-hidden shadow-xl">
+            <Table className="w-full border-collapse">
+              <TableHeader className="bg-gray-700">
+                <TableRow className="border-b-0">
+                  <TableHead className="font-bold text-white py-4 border-0">Fecha y Hora</TableHead>
+                  <TableHead className="font-bold text-white py-4 border-0">Estado</TableHead>
+                  <TableHead className="font-bold text-white py-4 border-0">Nombre de Usuario</TableHead>
+                  <TableHead className="font-bold text-white py-4 border-0">Costo</TableHead>
+                  <TableHead className="font-bold text-white py-4 border-0">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {currentItems.length > 0 ? (
+                  currentItems.map((item) => (
+                    <TableRow key={item.id} className="border-0 hover:bg-gray-50">
+                      <TableCell className="border-0 py-3">{formatDate(item.fechaHora)}</TableCell>
+                      <TableCell className="border-0 py-3">
+                        <Badge className={item.estado === "deuda" ? "bg-red-500" : "bg-green-500"}>{item.estado}</Badge>
+                      </TableCell>
+                      <TableCell className="border-0 py-3">{item.usuario?.nombre || "N/A"}</TableCell>
+                      <TableCell className="border-0 py-3">Bs {item.costo || 30}</TableCell>
+                      <TableCell className="border-0 py-3">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-blue-500 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
+                          onClick={() => handleViewDetails(item)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8 text-gray-500 border-0">
+                      No hay cargas para mostrar con los filtros seleccionados.
                     </TableCell>
                   </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-gray-500">
-                    No hay cargas para mostrar con los filtros seleccionados.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+                )}
+              </TableBody>
+            </Table>
+          </div>
 
           <div className="flex justify-between items-center mt-4">
             <Button onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))} disabled={currentPage === 1}>

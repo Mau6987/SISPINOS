@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { ChevronLeft, ChevronRight, Eye, Filter } from "lucide-react"
+import { ChevronLeft, ChevronRight, Eye, Filter, CreditCard } from "lucide-react"
 
 import { Button } from "../../components/components/ui/button"
 import { Input } from "../../components/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/components/ui/table"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../../components/components/ui/dialog"
+import { Card, CardContent, CardHeader, CardTitle } from "../../components/components/ui/card"
 
 const ITEMS_PER_PAGE = 10
 
@@ -20,6 +21,7 @@ export default function OwnerPaymentsTable() {
   const [selectedPayment, setSelectedPayment] = useState(null)
   const [filterStartDate, setFilterStartDate] = useState("")
   const [filterEndDate, setFilterEndDate] = useState("")
+  const [loading, setLoading] = useState(true)
 
   const router = useRouter()
 
@@ -38,6 +40,7 @@ export default function OwnerPaymentsTable() {
     setFilterEndDate(lastDayOfMonth.toISOString().split("T")[0])
 
     const fetchData = async () => {
+      setLoading(true)
       const token = localStorage.getItem("token")
       const ownerId = localStorage.getItem("idUser")
       const url = `https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/pagosPropietario/${ownerId}`
@@ -56,6 +59,8 @@ export default function OwnerPaymentsTable() {
         }
       } catch (error) {
         console.error("Error fetching data:", error)
+      } finally {
+        setLoading(false)
       }
     }
 
@@ -105,62 +110,122 @@ export default function OwnerPaymentsTable() {
   const currentItems = filteredData.slice(indexOfFirstItem, indexOfLastItem)
   const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE)
 
+  // Calcular el monto total de pagos
+  const calcularMontoTotal = () => {
+    return filteredData.reduce((total, item) => total + (item.monto || 0), 0)
+  }
+
   return (
     <div className="container mx-auto px-4 pt-20 pb-8">
-      <h1 className="text-3xl font-bold mb-8 text-center">Pagos del Propietario y Conductores</h1>
-      <div className="flex justify-end items-center mb-6">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">Pagos del Propietario y Conductores</h1>
         <Button onClick={() => setShowFilterDialog(true)}>
           <Filter className="mr-2 h-4 w-4" /> Filtrar por Fecha
         </Button>
       </div>
 
-      <div className="rounded-lg overflow-hidden shadow-lg border border-gray-300">
-        <Table>
-          <TableHeader className="bg-gray-200">
-            <TableRow>
-              <TableHead className="text-gray-800 font-semibold">Fecha y Hora</TableHead>
-              <TableHead className="text-gray-800 font-semibold">Monto</TableHead>
-              <TableHead className="text-gray-800 font-semibold">Nombre de Usuario</TableHead>
-              <TableHead className="text-gray-800 font-semibold">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {currentItems.map((item) => (
-              <TableRow key={item.id}>
-                <TableCell>{formatDate(item.fechaHora)}</TableCell>
-                <TableCell>{item.monto}</TableCell>
-                <TableCell>{item.usuario?.nombre || "N/A"}</TableCell>
-                <TableCell>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 border-blue-300 font-medium"
-                    onClick={() => handleViewDetails(item)}
-                  >
-                    <Eye className="h-4 w-4 mr-1" />
-                    Ver
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+      {/* Resumen de pagos */}
+      <div className="mb-8">
+        <Card className="shadow-md border-2 border-gray-300 rounded-lg">
+          <CardHeader className="bg-blue-900 text-white">
+            <CardTitle className="text-white">Resumen de Pagos</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Total de pagos */}
+              <div className="text-center">
+                <div className="bg-blue-100 p-2 rounded-t-md">
+                  <p className="font-semibold text-blue-800">Total de Pagos</p>
+                </div>
+                <div className="border border-t-0 border-blue-200 rounded-b-md p-3">
+                  <div className="flex items-center justify-center gap-2">
+                    <CreditCard className="h-5 w-5 text-blue-600" />
+                    <p className="text-2xl font-bold">{filteredData.length}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Monto total */}
+              <div className="text-center">
+                <div className="bg-green-100 p-2 rounded-t-md">
+                  <p className="font-semibold text-green-800">Monto Total</p>
+                </div>
+                <div className="border border-t-0 border-green-200 rounded-b-md p-3">
+                  <div className="flex items-center justify-center gap-2">
+                    <CreditCard className="h-5 w-5 text-green-600" />
+                    <p className="text-2xl font-bold">Bs {calcularMontoTotal()}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      <div className="flex justify-between items-center mt-6">
-        <Button onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))} disabled={currentPage === 1}>
-          <ChevronLeft className="mr-2 h-4 w-4" /> Anterior
-        </Button>
-        <span>
-          Página {currentPage} de {totalPages}
-        </span>
-        <Button
-          onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-          disabled={currentPage === totalPages}
-        >
-          Siguiente <ChevronRight className="ml-2 h-4 w-4" />
-        </Button>
-      </div>
+      {loading ? (
+        <div className="flex justify-center items-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+        </div>
+      ) : (
+        <>
+          {/* Tabla con borde exterior más definido */}
+          <div className="border-[3px] border-gray-600 rounded-lg overflow-hidden shadow-xl">
+            <Table className="w-full border-collapse">
+              <TableHeader className="bg-gray-700">
+                <TableRow className="border-b-0">
+                  <TableHead className="font-bold text-white py-4 border-0">Fecha y Hora</TableHead>
+                  <TableHead className="font-bold text-white py-4 border-0">Monto</TableHead>
+                  <TableHead className="font-bold text-white py-4 border-0">Nombre de Usuario</TableHead>
+                  <TableHead className="font-bold text-white py-4 border-0">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {currentItems.length > 0 ? (
+                  currentItems.map((item) => (
+                    <TableRow key={item.id} className="border-0 hover:bg-gray-50">
+                      <TableCell className="border-0 py-3">{formatDate(item.fechaHora)}</TableCell>
+                      <TableCell className="border-0 py-3">Bs {item.monto}</TableCell>
+                      <TableCell className="border-0 py-3">{item.usuario?.nombre || "N/A"}</TableCell>
+                      <TableCell className="border-0 py-3">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 border-blue-300 font-medium"
+                          onClick={() => handleViewDetails(item)}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          Ver
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center py-8 text-gray-500 border-0">
+                      No hay pagos para mostrar con los filtros seleccionados.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          <div className="flex justify-between items-center mt-6">
+            <Button onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))} disabled={currentPage === 1}>
+              <ChevronLeft className="mr-2 h-4 w-4" /> Anterior
+            </Button>
+            <span>
+              Página {currentPage} de {totalPages || 1}
+            </span>
+            <Button
+              onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages || totalPages === 0}
+            >
+              Siguiente <ChevronRight className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+        </>
+      )}
 
       <Dialog open={showFilterDialog} onOpenChange={setShowFilterDialog}>
         <DialogContent>
@@ -211,7 +276,7 @@ export default function OwnerPaymentsTable() {
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <span className="font-medium">Monto:</span>
-              <span className="col-span-3">{selectedPayment?.monto}</span>
+              <span className="col-span-3">Bs {selectedPayment?.monto}</span>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <span className="font-medium">Usuario:</span>
@@ -223,4 +288,3 @@ export default function OwnerPaymentsTable() {
     </div>
   )
 }
-

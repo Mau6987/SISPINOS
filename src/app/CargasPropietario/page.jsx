@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { ChevronLeft, ChevronRight, Eye, Filter, Calendar, CreditCard } from "lucide-react"
+import { ChevronLeft, ChevronRight, Eye, Filter, CreditCard, Droplet } from "lucide-react"
 
 import { Button } from "../../components/components/ui/button"
 import { Input } from "../../components/components/ui/input"
@@ -36,6 +36,8 @@ export default function WaterChargesOwner() {
     totalDeuda: 0,
     montoPagadas: 0,
     montoDeuda: 0,
+    totalConductores: 0,
+    conductoresPorCargas: {},
   })
 
   const router = useRouter()
@@ -92,6 +94,7 @@ export default function WaterChargesOwner() {
     fetchData()
   }, [router, filterStatus, filterStartDate, filterEndDate, showAllTime])
 
+  // Modificar la función updateSummary para incluir información detallada de conductores
   const updateSummary = (data) => {
     const pagadas = data.filter((item) => item.estado === "pagado")
     const deuda = data.filter((item) => item.estado === "deuda")
@@ -99,12 +102,44 @@ export default function WaterChargesOwner() {
     const montoPagadas = pagadas.reduce((total, item) => total + (item.costo || 30), 0)
     const montoDeuda = deuda.reduce((total, item) => total + (item.costo || 30), 0)
 
+    // Contar conductores únicos y sus cargas (solo usuarios con rol "conductor")
+    const conductoresUnicos = new Set()
+    const conductoresPorCargas = {}
+
+    data.forEach((item) => {
+      if (item.usuario?.id && item.usuario?.rol?.toLowerCase() === "conductor") {
+        const conductorId = item.usuario.id
+        const conductorNombre = item.usuario.nombre || `Conductor ${conductorId}`
+
+        conductoresUnicos.add(conductorId)
+
+        if (!conductoresPorCargas[conductorId]) {
+          conductoresPorCargas[conductorId] = {
+            nombre: conductorNombre,
+            totalCargas: 0,
+            cargasPagadas: 0,
+            cargasDeuda: 0,
+          }
+        }
+
+        conductoresPorCargas[conductorId].totalCargas++
+
+        if (item.estado === "pagado") {
+          conductoresPorCargas[conductorId].cargasPagadas++
+        } else if (item.estado === "deuda") {
+          conductoresPorCargas[conductorId].cargasDeuda++
+        }
+      }
+    })
+
     setSummary({
       totalCargas: data.length,
       totalPagadas: pagadas.length,
       totalDeuda: deuda.length,
       montoPagadas,
       montoDeuda,
+      totalConductores: conductoresUnicos.size,
+      conductoresPorCargas,
     })
   }
 
@@ -200,6 +235,27 @@ export default function WaterChargesOwner() {
   const currentItems = filteredData.slice(indexOfFirstItem, indexOfLastItem)
   const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE)
 
+  // Calcular el monto total de los conductores
+  const calcularMontoTotal = () => {
+    // Suma el costo de todas las cargas en filteredData
+    return filteredData.reduce((total, item) => total + (item.costo || 30), 0)
+  }
+
+  // Función para obtener un color de fondo para cada conductor
+  const getBackgroundColor = (index) => {
+    const colors = [
+      "bg-blue-50",
+      "bg-green-50",
+      "bg-purple-50",
+      "bg-yellow-50",
+      "bg-pink-50",
+      "bg-indigo-50",
+      "bg-teal-50",
+      "bg-orange-50",
+    ]
+    return colors[index % colors.length]
+  }
+
   return (
     <div className="container mx-auto px-4 pt-20 pb-8">
       <div className="flex justify-between items-center mb-6">
@@ -209,14 +265,15 @@ export default function WaterChargesOwner() {
         </Button>
       </div>
 
-      {/* Resumen de cargas */}
+      {/* Resumen principal con detalle de conductores integrado */}
       <div className="mb-8">
         <Card className="shadow-md border-2 border-gray-300 rounded-lg">
           <CardHeader className="bg-blue-900 text-white">
             <CardTitle className="text-white">{getSummaryTitle()}</CardTitle>
           </CardHeader>
           <CardContent className="p-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Resumen general */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               {/* Total de cargas */}
               <div className="text-center">
                 <div className="bg-blue-100 p-2 rounded-t-md">
@@ -224,10 +281,10 @@ export default function WaterChargesOwner() {
                 </div>
                 <div className="border border-t-0 border-blue-200 rounded-b-md p-3">
                   <div className="flex items-center justify-center gap-2">
-                    <Calendar className="h-5 w-5 text-blue-600" />
+                    <Droplet className="h-5 w-5 text-blue-600" />
                     <p className="text-2xl font-bold">{summary.totalCargas}</p>
                   </div>
-                  <p className="text-sm text-gray-500 mt-1">Bs {summary.montoPagadas + summary.montoDeuda}</p>
+                  <p className="text-sm text-gray-500 mt-1">Bs {calcularMontoTotal()}</p>
                 </div>
               </div>
 
@@ -259,6 +316,34 @@ export default function WaterChargesOwner() {
                 </div>
               </div>
             </div>
+
+            {/* Detalle de conductores con colores suaves */}
+            {Object.keys(summary.conductoresPorCargas).length > 0 && (
+              <div className="mt-4 border-t pt-4">
+                <h3 className="text-lg font-semibold mb-3">Conductores</h3>
+                <div className="grid grid-cols-1 gap-2">
+                  {Object.values(summary.conductoresPorCargas).map((conductor, index) => (
+                    <div
+                      key={index}
+                      className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-md ${getBackgroundColor(index)}`}
+                    >
+                      <div className="font-medium text-gray-800 mb-2 sm:mb-0">{conductor.nombre}</div>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
+                          cargas {conductor.totalCargas}
+                        </Badge>
+                        <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
+                          pagadas {conductor.cargasPagadas}
+                        </Badge>
+                        <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
+                          deuda {conductor.cargasDeuda}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -269,47 +354,50 @@ export default function WaterChargesOwner() {
         </div>
       ) : (
         <>
-          <Table className="border border-gray-200 rounded-lg overflow-hidden">
-            <TableHeader className="bg-gray-700">
-              <TableRow>
-                <TableHead className="font-bold text-white">Fecha y Hora</TableHead>
-                <TableHead className="font-bold text-white">Estado</TableHead>
-                <TableHead className="font-bold text-white">Nombre de Usuario</TableHead>
-                <TableHead className="font-bold text-white">Costo</TableHead>
-                <TableHead className="font-bold text-white">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {currentItems.length > 0 ? (
-                currentItems.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell>{formatDate(item.fechaHora)}</TableCell>
-                    <TableCell>
-                      <Badge className={item.estado === "deuda" ? "bg-red-500" : "bg-green-500"}>{item.estado}</Badge>
-                    </TableCell>
-                    <TableCell>{item.usuario?.nombre || "N/A"}</TableCell>
-                    <TableCell>Bs {item.costo || 30}</TableCell>
-                    <TableCell>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-blue-500 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
-                        onClick={() => handleViewDetails(item)}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
+          {/* Tabla con borde exterior más delgado */}
+          <div className="border-[3px] border-gray-600 rounded-lg overflow-hidden shadow-xl">
+            <Table className="w-full border-collapse">
+              <TableHeader className="bg-gray-700">
+                <TableRow className="border-b-0">
+                  <TableHead className="font-bold text-white py-4 border-0">Fecha y Hora</TableHead>
+                  <TableHead className="font-bold text-white py-4 border-0">Estado</TableHead>
+                  <TableHead className="font-bold text-white py-4 border-0">Nombre de Usuario</TableHead>
+                  <TableHead className="font-bold text-white py-4 border-0">Costo</TableHead>
+                  <TableHead className="font-bold text-white py-4 border-0">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {currentItems.length > 0 ? (
+                  currentItems.map((item) => (
+                    <TableRow key={item.id} className="border-0 hover:bg-gray-50">
+                      <TableCell className="border-0 py-3">{formatDate(item.fechaHora)}</TableCell>
+                      <TableCell className="border-0 py-3">
+                        <Badge className={item.estado === "deuda" ? "bg-red-500" : "bg-green-500"}>{item.estado}</Badge>
+                      </TableCell>
+                      <TableCell className="border-0 py-3">{item.usuario?.nombre || "N/A"}</TableCell>
+                      <TableCell className="border-0 py-3">Bs {item.costo || 30}</TableCell>
+                      <TableCell className="border-0 py-3">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-blue-500 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
+                          onClick={() => handleViewDetails(item)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8 text-gray-500 border-0">
+                      No hay cargas para mostrar con los filtros seleccionados.
                     </TableCell>
                   </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-gray-500">
-                    No hay cargas para mostrar con los filtros seleccionados.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+                )}
+              </TableBody>
+            </Table>
+          </div>
 
           <div className="flex justify-between items-center mt-4">
             <Button onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))} disabled={currentPage === 1}>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Filter, Calendar, DollarSign, CreditCard } from "lucide-react"
+import { Filter, Calendar, DollarSign, CreditCard, ChevronLeft, ChevronRight } from "lucide-react"
 import Swal from "sweetalert2"
 import { Button } from "../../components/components/ui/button"
 import { Input } from "../../components/components/ui/input"
@@ -83,6 +83,10 @@ export default function UsuarioDetalles() {
   const [totalTodasCargas, setTotalTodasCargas] = useState(0)
   const [totalTodasDeuda, setTotalTodasDeuda] = useState(0)
 
+  // Estados para paginación
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 6
+
   useEffect(() => {
     const role = localStorage.getItem("rol")
     if (role !== "admin") {
@@ -113,6 +117,11 @@ export default function UsuarioDetalles() {
       }
     }
   }, [usuarios, autoLoadUserId])
+
+  // Resetear la paginación cuando cambian los datos
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [cargas, filtroEstado, fechaInicio, fechaFin, filtrosActivos])
 
   const fetchUsuarios = async () => {
     try {
@@ -441,6 +450,21 @@ export default function UsuarioDetalles() {
 
   const cargasFiltradas = filtrarCargas()
 
+  // Funciones para paginación
+  const getPaginatedData = (data, page, itemsPerPage) => {
+    const startIndex = (page - 1) * itemsPerPage
+    const endIndex = startIndex + itemsPerPage
+    return data.slice(startIndex, endIndex)
+  }
+
+  const getTotalPages = (totalItems, itemsPerPage) => {
+    return Math.ceil(totalItems / itemsPerPage)
+  }
+
+  // Datos paginados
+  const paginatedCargas = getPaginatedData(cargasFiltradas, currentPage, itemsPerPage)
+  const totalPages = getTotalPages(cargasFiltradas.length, itemsPerPage)
+
   const getInitials = (name) => {
     if (!name) return "U"
     return name
@@ -470,7 +494,7 @@ export default function UsuarioDetalles() {
       <h1 className="text-2xl font-bold mb-6">Pago por usuario</h1>
 
       <>
-        <Card className="mb-6 shadow-md">
+        <Card className="mb-6 shadow-md border-2 border-gray-300 rounded-lg">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Información del Usuario</CardTitle>
             <Button variant="outline" onClick={handleCambiarUsuario}>
@@ -501,7 +525,7 @@ export default function UsuarioDetalles() {
                       <h3 className="text-sm font-medium text-gray-500">CI</h3>
                       <p className="text-lg">{usuarioSeleccionado?.ci || "No disponible"}</p>
                     </div>
-                   
+
                     <Badge className="mt-1">{usuarioSeleccionado?.rol}</Badge>
                   </div>
                 </div>
@@ -510,7 +534,7 @@ export default function UsuarioDetalles() {
               {/* Columna derecha: Resumen de cargas */}
               <div className="md:w-1/2">
                 <div className="grid grid-cols-1 gap-4">
-                  <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+                  <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-200">
                     <h4 className="text-sm font-medium text-gray-500">Total de Cargas</h4>
                     <div className="flex items-center mt-2">
                       <Calendar className="h-5 w-5 mr-2 text-gray-900" />
@@ -518,7 +542,7 @@ export default function UsuarioDetalles() {
                     </div>
                   </div>
 
-                  <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+                  <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-200">
                     <h4 className="text-sm font-medium text-gray-500">Cargas con Deuda</h4>
                     <div className="flex items-center mt-2">
                       <CreditCard className="h-5 w-5 mr-2 text-amber-600" />
@@ -526,7 +550,7 @@ export default function UsuarioDetalles() {
                     </div>
                   </div>
 
-                  <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+                  <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-200">
                     <h4 className="text-sm font-medium text-gray-500">Total Deuda</h4>
                     <div className="flex items-center mt-2">
                       <DollarSign className="h-5 w-5 mr-2 text-red-600" />
@@ -548,7 +572,7 @@ export default function UsuarioDetalles() {
 
         {usuarioSeleccionado?.rol === "propietario" && (
           <Tabs value={activeTab} onValueChange={handleTabChange} className="mb-6">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-2 border-2 border-gray-300">
               <TabsTrigger value="propietario">Cargas del Propietario</TabsTrigger>
               <TabsTrigger value="conductores">Cargas de Conductores</TabsTrigger>
             </TabsList>
@@ -559,7 +583,7 @@ export default function UsuarioDetalles() {
 
             <TabsContent value="conductores">
               {/* Selector de conductor y sus cargas */}
-              <Card className="mb-6 shadow-md">
+              <Card className="mb-6 shadow-md border-2 border-gray-300 rounded-lg">
                 <CardHeader>
                   <CardTitle>Seleccionar Conductor</CardTitle>
                 </CardHeader>
@@ -568,7 +592,7 @@ export default function UsuarioDetalles() {
                     <p className="text-center py-4 text-gray-500">No hay conductores asociados a este propietario.</p>
                   ) : (
                     <Select onValueChange={handleConductorChange} value={conductorSeleccionado?.id?.toString()}>
-                      <SelectTrigger>
+                      <SelectTrigger className="border-2 border-gray-300">
                         <SelectValue placeholder="Seleccione un conductor" />
                       </SelectTrigger>
                       <SelectContent>
@@ -584,13 +608,13 @@ export default function UsuarioDetalles() {
               </Card>
 
               {conductorSeleccionado && (
-                <Card className="shadow-md mb-6">
+                <Card className="shadow-md mb-6 border-2 border-gray-300 rounded-lg">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-lg">Resumen de Cargas - {conductorSeleccionado.nombre}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="bg-white p-4 rounded-lg shadow-sm">
+                      <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-200">
                         <h4 className="text-sm font-medium text-gray-500">Total de Cargas</h4>
                         <div className="flex items-center mt-2">
                           <Calendar className="h-5 w-5 mr-2 text-gray-900" />
@@ -598,7 +622,7 @@ export default function UsuarioDetalles() {
                         </div>
                       </div>
 
-                      <div className="bg-white p-4 rounded-lg shadow-sm">
+                      <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-200">
                         <h4 className="text-sm font-medium text-gray-500">Cargas con Deuda</h4>
                         <div className="flex items-center mt-2">
                           <CreditCard className="h-5 w-5 mr-2 text-amber-600" />
@@ -606,7 +630,7 @@ export default function UsuarioDetalles() {
                         </div>
                       </div>
 
-                      <div className="bg-white p-4 rounded-lg shadow-sm">
+                      <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-200">
                         <h4 className="text-sm font-medium text-gray-500">Total Deuda</h4>
                         <div className="flex items-center mt-2">
                           <DollarSign className="h-5 w-5 mr-2 text-red-600" />
@@ -628,7 +652,7 @@ export default function UsuarioDetalles() {
           </Tabs>
         )}
 
-        <Card className="mb-6 shadow-md">
+        <Card className="mb-6 shadow-md border-2 border-gray-300 rounded-lg">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>
               {usuarioSeleccionado?.rol === "propietario" && activeTab === "conductores" && conductorSeleccionado
@@ -649,8 +673,11 @@ export default function UsuarioDetalles() {
             ) : isMobile ? (
               // Modificar la vista móvil para incluir el botón de pago y mostrar el usuario
               <div className="space-y-4">
-                {cargasFiltradas.map((carga) => (
-                  <Card key={carga.id} className="shadow-sm hover:shadow-md transition-shadow duration-200">
+                {paginatedCargas.map((carga) => (
+                  <Card
+                    key={carga.id}
+                    className="shadow-sm hover:shadow-md transition-shadow duration-200 border-2 border-gray-200"
+                  >
                     <CardContent className="p-4">
                       <p>
                         <strong>ID:</strong> {carga.id}
@@ -721,63 +748,113 @@ export default function UsuarioDetalles() {
                     </CardFooter>
                   </Card>
                 ))}
+
+                {/* Paginación para vista móvil */}
+                <div className="flex justify-between items-center mt-4">
+                  <Button
+                    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    variant="outline"
+                    className="border-2 border-gray-300"
+                  >
+                    <ChevronLeft className="mr-2 h-4 w-4" /> Anterior
+                  </Button>
+                  <span>
+                    Página {currentPage} de {totalPages || 1}
+                  </span>
+                  <Button
+                    onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages || totalPages === 0}
+                    variant="outline"
+                    className="border-2 border-gray-300"
+                  >
+                    Siguiente <ChevronRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             ) : (
-              <Table>
-                <TableHeader className="bg-gray-900 border-b-2 border-gray-700 shadow-md">
-                  <TableRow>
-                    <TableHead className="font-bold text-gray-300 border-r border-gray-700">ID</TableHead>
-                    <TableHead className="font-bold text-gray-300 border-r border-gray-700">Fecha y Hora</TableHead>
-                    <TableHead className="font-bold text-gray-300 border-r border-gray-700">Estado</TableHead>
-                    <TableHead className="font-bold text-gray-300 border-r border-gray-700">Costo</TableHead>
-                    <TableHead className="font-bold text-gray-300 border-r border-gray-700">Usuario</TableHead>
-                    <TableHead className="font-bold text-gray-300">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {cargasFiltradas.map((carga) => (
-                    <TableRow key={carga.id}>
-                      <TableCell>{carga.id}</TableCell>
-                      <TableCell>{new Date(carga.fechaHora).toLocaleString()}</TableCell>
-                      <TableCell>
-                        <Badge className={carga.estado === "deuda" ? "bg-red-500" : "bg-green-500"}>
-                          {carga.estado}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>Bs{carga.costo || 30}</TableCell>
-                      <TableCell>{carga.usuario?.nombre || "N/A"}</TableCell>
-                      <TableCell>
-                        <div className="flex space-x-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => fetchChargeDetails(carga.id)}
-                            className="bg-gray-900 hover:bg-gray-800 text-white border-gray-700"
-                          >
-                            Ver Detalles
-                          </Button>
-                          {carga.estado === "deuda" && (
+              <div className="border-[3px] border-gray-600 rounded-lg overflow-hidden shadow-xl">
+                <Table className="w-full border-collapse">
+                  <TableHeader className="bg-gray-700">
+                    <TableRow className="border-b-0">
+                      <TableHead className="font-bold text-white py-4 border-0">ID</TableHead>
+                      <TableHead className="font-bold text-white py-4 border-0">Fecha y Hora</TableHead>
+                      <TableHead className="font-bold text-white py-4 border-0">Estado</TableHead>
+                      <TableHead className="font-bold text-white py-4 border-0">Costo</TableHead>
+                      <TableHead className="font-bold text-white py-4 border-0">Usuario</TableHead>
+                      <TableHead className="font-bold text-white py-4 border-0">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedCargas.map((carga) => (
+                      <TableRow key={carga.id} className="border-0 hover:bg-gray-50">
+                        <TableCell className="border-0 py-3">{carga.id}</TableCell>
+                        <TableCell className="border-0 py-3">{new Date(carga.fechaHora).toLocaleString()}</TableCell>
+                        <TableCell className="border-0 py-3">
+                          <Badge className={carga.estado === "deuda" ? "bg-red-500" : "bg-green-500"}>
+                            {carga.estado}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="border-0 py-3">Bs{carga.costo || 30}</TableCell>
+                        <TableCell className="border-0 py-3">{carga.usuario?.nombre || "N/A"}</TableCell>
+                        <TableCell className="border-0 py-3">
+                          <div className="flex space-x-2">
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => {
-                                // Configurar para pagar solo esta carga específica
-                                setCargasDeuda([carga])
-                                setNumeroCargasAPagar(1)
-                                setMontoTotal(carga.costo || 30)
-                                setShowPaymentDialog(true)
-                              }}
-                              className="bg-red-600 hover:bg-red-700 text-white border-red-500"
+                              onClick={() => fetchChargeDetails(carga.id)}
+                              className="bg-gray-900 hover:bg-gray-800 text-white border-gray-700"
                             >
-                              Pagar
+                              Ver Detalles
                             </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                            {carga.estado === "deuda" && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  // Configurar para pagar solo esta carga específica
+                                  setCargasDeuda([carga])
+                                  setNumeroCargasAPagar(1)
+                                  setMontoTotal(carga.costo || 30)
+                                  setShowPaymentDialog(true)
+                                }}
+                                className="bg-red-600 hover:bg-red-700 text-white border-red-500"
+                              >
+                                Pagar
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+
+            {/* Paginación para vista de escritorio */}
+            {!isMobile && cargasFiltradas.length > 0 && (
+              <div className="flex justify-between items-center mt-6">
+                <Button
+                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  variant="outline"
+                  className="border-2 border-gray-300"
+                >
+                  <ChevronLeft className="mr-2 h-4 w-4" /> Anterior
+                </Button>
+                <span>
+                  Página {currentPage} de {totalPages || 1}
+                </span>
+                <Button
+                  onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages || totalPages === 0}
+                  variant="outline"
+                  className="border-2 border-gray-300"
+                >
+                  Siguiente <ChevronRight className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -786,7 +863,7 @@ export default function UsuarioDetalles() {
       {/* Diálogo de Pago */}
 
       <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
-        <DialogContent>
+        <DialogContent className="border-2 border-gray-300">
           <DialogHeader>
             <DialogTitle>
               {cargasDeuda.length === 1
@@ -814,20 +891,20 @@ export default function UsuarioDetalles() {
                   max={cargasDeuda.length}
                   value={numeroCargasAPagar}
                   onChange={handleNumeroCargasChange}
-                  className="col-span-3"
+                  className="col-span-3 border-2 border-gray-300"
                 />
               </div>
             )}
             <div className="grid grid-cols-4 items-center gap-4">
               <Label className="text-right">Monto Total:</Label>
               <div className="col-span-3 flex items-center">
-                <Input value={`Bs${montoTotal}`} readOnly className="bg-gray-50" />
+                <Input value={`Bs${montoTotal}`} readOnly className="bg-gray-50 border-2 border-gray-300" />
               </div>
             </div>
             {numeroCargasAPagar > 0 && (
               <div className="mt-2">
                 <h4 className="font-medium mb-2">Cargas a pagar:</h4>
-                <div className="max-h-40 overflow-y-auto border rounded-md p-2">
+                <div className="max-h-40 overflow-y-auto border-2 border-gray-300 rounded-md p-2">
                   {cargasDeuda.slice(0, numeroCargasAPagar).map((carga) => (
                     <div key={carga.id} className="flex justify-between py-1 border-b last:border-0">
                       <span>
@@ -842,7 +919,7 @@ export default function UsuarioDetalles() {
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPaymentDialog(false)}>
+            <Button variant="outline" onClick={() => setShowPaymentDialog(false)} className="border-2 border-gray-300">
               Cancelar
             </Button>
             <Button onClick={handlePagar} className="bg-gray-900 hover:bg-gray-800 text-white">
@@ -854,7 +931,7 @@ export default function UsuarioDetalles() {
 
       {/* Diálogo de Filtros */}
       <Dialog open={showFilterDialog} onOpenChange={setShowFilterDialog}>
-        <DialogContent>
+        <DialogContent className="border-2 border-gray-300">
           <DialogHeader>
             <DialogTitle>Filtrar Cargas</DialogTitle>
           </DialogHeader>
@@ -874,7 +951,7 @@ export default function UsuarioDetalles() {
                   Estado:
                 </Label>
                 <Select value={filtroEstado} onValueChange={setFiltroEstado} disabled={!filtrosActivos}>
-                  <SelectTrigger className="col-span-3">
+                  <SelectTrigger className="col-span-3 border-2 border-gray-300">
                     <SelectValue placeholder="Todos los estados" />
                   </SelectTrigger>
                   <SelectContent>
@@ -893,7 +970,7 @@ export default function UsuarioDetalles() {
                   type="date"
                   value={fechaInicio}
                   onChange={(e) => setFechaInicio(e.target.value)}
-                  className="col-span-3"
+                  className="col-span-3 border-2 border-gray-300"
                   disabled={!filtrosActivos}
                 />
               </div>
@@ -906,21 +983,23 @@ export default function UsuarioDetalles() {
                   type="date"
                   value={fechaFin}
                   onChange={(e) => setFechaFin(e.target.value)}
-                  className="col-span-3"
+                  className="col-span-3 border-2 border-gray-300"
                   disabled={!filtrosActivos}
                 />
               </div>
             </div>
           </div>
           <DialogFooter>
-            <Button onClick={() => setShowFilterDialog(false)}>{filtrosActivos ? "Aplicar Filtros" : "Cerrar"}</Button>
+            <Button onClick={() => setShowFilterDialog(false)} className="border-2 border-gray-300">
+              {filtrosActivos ? "Aplicar Filtros" : "Cerrar"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Diálogo de Detalles de Carga */}
       <Dialog open={showChargeDetailsDialog} onOpenChange={setShowChargeDetailsDialog}>
-        <DialogContent>
+        <DialogContent className="border-2 border-gray-300">
           <DialogHeader>
             <DialogTitle>Detalles de la Carga #{selectedCharge?.id}</DialogTitle>
           </DialogHeader>
@@ -953,7 +1032,9 @@ export default function UsuarioDetalles() {
             </div>
           )}
           <DialogFooter>
-            <Button onClick={() => setShowChargeDetailsDialog(false)}>Cerrar</Button>
+            <Button onClick={() => setShowChargeDetailsDialog(false)} className="border-2 border-gray-300">
+              Cerrar
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

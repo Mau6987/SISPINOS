@@ -10,10 +10,10 @@ export default function Page() {
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [loginError, setLoginError] = useState(false)
-
+// CAMBIO
   const handleLogin = async () => {
     try {
-      const response = await fetch("https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/login", {
+      const response = await fetch("https://mi-backendsecond.onrender.com/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ correo, username, password }),
@@ -36,16 +36,19 @@ export default function Page() {
       setLoginError(true)
     }
   }
-
+//cabios
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#1a3a5f] to-[#0f2942]">
+      
       <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-lg">
+        
         {/* Logo */}
         <div className="flex justify-center mb-6">
           <Image src="/logo3.png" alt="Logo" width={120} height={120} />
         </div>
 
         {/* Título */}
+        
         <h1 className="text-3xl font-bold text-center text-gray-800 mb-6 font-inter">Inicio de sesión</h1>
 
         {/* Inputs */}
@@ -129,7 +132,7 @@ export default function Page() {
               : "bg-blue-600 hover:bg-blue-700 text-white"
           }`}
         >
-          Iniciar sesión
+          Iniciar sesión 
         </button>
       </div>
     </div>

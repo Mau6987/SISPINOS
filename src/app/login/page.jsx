@@ -13,7 +13,7 @@ export default function Page() {
 
   const handleLogin = async () => {
     try {
-      const response = await fetch("https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/login", {
+      const response = await fetch("https://mi-backendsecond.onrender.com/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ correo, username, password }),
@@ -76,7 +76,8 @@ export default function Page() {
             !username || !password ? "bg-gray-400 cursor-not-allowed" : "bg-[#2c7be5] hover:bg-[#1a68d1]"
           }`}
         >
-          Iniciar sesión
+          
+          LOS PINOS Iniciar sesión
         </button>
       </div>
     </div>

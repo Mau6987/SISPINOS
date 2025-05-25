@@ -19,9 +19,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Checkbox } from "../../components/components/ui/checkbox"
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/components/ui/card"
 import { Badge } from "../../components/components/ui/badge"
-// Corregir la importación del Toaster
 import { Toaster } from "../../components/components/ui/toaster"
-import { toast } from "../../components/hooks/use-toast";
+import { toast } from "../../components/hooks/use-toast"
+import RFIDCardManager from "../../components/rfid-card-manager"
+import UserBlockManager from "../../components/user-block-manager"
+
 
 export default function UserManagement() {
   const [users, setUsers] = useState([])
@@ -37,8 +39,9 @@ export default function UserManagement() {
     rol: "",
     ci: "",
     password: "",
-    numeroTarjetaRFID: "",
     propietarioId: "",
+    bloqueado: false,
+    motivoBloqueo: "",
   })
   const [editMode, setEditMode] = useState(false)
   const [viewMode, setViewMode] = useState(false)
@@ -210,8 +213,10 @@ export default function UserManagement() {
       rol: "",
       ci: "",
       password: "",
-      numeroTarjetaRFID: "",
-      propietarioId: null, // Asegurarnos de que sea null y no string vacío
+      propietarioId: null,
+      bloqueado: false,
+      motivoBloqueo: "",
+      // Eliminamos numeroTarjetaRFID del formulario inicial
     })
     setShowModal(true)
     setEditMode(false)
@@ -252,11 +257,27 @@ export default function UserManagement() {
       return
     }
 
-    // Asegurarnos de que propietarioId sea null cuando no es conductor
+    // Asegurarnos de que propietarioId sea un número cuando se envía
+    // y que sea null cuando no es conductor
     const dataToSend = {
       ...formData,
-      propietarioId: formData.rol === "conductor" ? formData.propietarioId : null,
+      propietarioId:
+        formData.rol === "conductor"
+          ? formData.propietarioId
+            ? Number.parseInt(formData.propietarioId, 10)
+            : null
+          : null,
     }
+
+    // Eliminar campos que no deberían enviarse al servidor
+    if (!editMode) {
+      delete dataToSend.bloqueado
+      delete dataToSend.motivoBloqueo
+      delete dataToSend.fechaBloqueo
+      delete dataToSend.numeroTarjetaRFID
+    }
+
+    console.log("Datos a enviar:", dataToSend) // Para depuración
 
     try {
       const url = editMode
@@ -418,6 +439,10 @@ export default function UserManagement() {
   const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser)
   const totalPages = Math.ceil(filteredUsers.length / usersPerPage)
 
+  // Estilos para el encabezado de la tabla
+  const tableHeaderStyle = "bg-blue-900"
+  const tableHeaderCellStyle = "font-bold border-r border-blue-800 last:border-r-0"
+
   return (
     <div className="container mx-auto px-4 py-8 mt-16">
       <Toaster />
@@ -490,23 +515,35 @@ export default function UserManagement() {
       )}
 
       <Card className="mb-6 border border-gray-300 shadow-sm">
-        <CardHeader>
+        <CardHeader className="pb-2">
           <CardTitle>Listado de Usuarios</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
-            <TableHeader className="bg-gray-200 border-b-2 border-gray-300 shadow-md">
+            <TableHeader className={tableHeaderStyle}>
               <TableRow>
-                <TableHead className="font-bold text-gray-700 border-r border-gray-300">Nombre</TableHead>
-                <TableHead className="font-bold text-gray-700 border-r border-gray-300">Username</TableHead>
-                <TableHead className="font-bold text-gray-700 border-r border-gray-300">Rol</TableHead>
-                <TableHead className="font-bold text-gray-700">Acciones</TableHead>
+                <TableHead className={`text-white ${tableHeaderCellStyle}`}>Nombre</TableHead>
+                <TableHead className={`text-white ${tableHeaderCellStyle}`}>Username</TableHead>
+                <TableHead className={`text-white ${tableHeaderCellStyle}`}>Rol</TableHead>
+                <TableHead className={`text-white ${tableHeaderCellStyle}`}>Estado</TableHead>
+                <TableHead className={`text-white ${tableHeaderCellStyle}`}>Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {currentUsers.map((user) => (
-                <TableRow key={user.id} className={user._isPending ? "bg-yellow-50" : ""}>
-                  <TableCell>
+                <TableRow
+                  key={user.id}
+                  className={`${
+                    user._isPending
+                      ? "bg-yellow-50"
+                      : user.bloqueado
+                        ? "bg-red-50"
+                        : currentUsers.indexOf(user) % 2 === 0
+                          ? "bg-white"
+                          : "bg-gray-100"
+                  } hover:bg-gray-50 transition-colors duration-150`}
+                >
+                  <TableCell className="border-b border-gray-200">
                     {user.nombre}
                     {user._isPending && (
                       <Badge variant="outline" className="ml-2 bg-yellow-100 text-yellow-800 border-yellow-300">
@@ -514,9 +551,20 @@ export default function UserManagement() {
                       </Badge>
                     )}
                   </TableCell>
-                  <TableCell>{user.username}</TableCell>
-                  <TableCell>{user.rol}</TableCell>
-                  <TableCell>
+                  <TableCell className="border-b border-gray-200">{user.username}</TableCell>
+                  <TableCell className="border-b border-gray-200">{user.rol}</TableCell>
+                  <TableCell className="border-b border-gray-200">
+                    {user.bloqueado ? (
+                      <Badge variant="outline" className="bg-red-100 text-red-800 border-red-300">
+                        Bloqueado
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">
+                        Activo
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="border-b border-gray-200">
                     <div className="flex space-x-2">
                       <Button
                         size="sm"
@@ -526,6 +574,7 @@ export default function UserManagement() {
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
+
                       <Button
                         size="sm"
                         variant="outline"
@@ -534,6 +583,7 @@ export default function UserManagement() {
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
+
                       <Button
                         size="sm"
                         variant="outline"
@@ -567,68 +617,89 @@ export default function UserManagement() {
       </div>
 
       <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent>
+        <DialogContent aria-describedby="dialog-description">
           <DialogHeader>
             <DialogTitle>
               {editMode ? "Editar Usuario" : viewMode ? "Detalles del Usuario" : "Crear Usuario"}
             </DialogTitle>
           </DialogHeader>
           {viewMode ? (
-            <div className="grid gap-4 py-4">
+            <div className="grid gap-4 py-4" id="dialog-description">
               {Object.entries(formData).map(([key, value]) => (
                 <div key={key} className="grid grid-cols-4 items-center gap-4">
                   <span className="font-medium text-right">{key.charAt(0).toUpperCase() + key.slice(1)}:</span>
                   <span className="col-span-3">
                     {key === "propietarioId" && value
                       ? propietarios.find((p) => p.id === value)?.nombre || value
-                      : value || "N/A"}
+                      : key === "bloqueado"
+                        ? value
+                          ? "Sí"
+                          : "No"
+                        : value || "N/A"}
                   </span>
                 </div>
               ))}
             </div>
           ) : (
             <form onSubmit={handleSaveUser}>
-              <div className="grid gap-4 py-4">
-                {Object.keys(formData).map((key) => (
-                  <div key={key} className="grid grid-cols-4 items-center gap-4">
-                    <label htmlFor={key} className="text-right">
-                      {key.charAt(0).toUpperCase() + key.slice(1)}:
-                    </label>
-                    {key === "rol" ? (
-                      <Select value={formData[key]} onValueChange={(value) => handleInputChange(key, value)}>
-                        <SelectTrigger className="col-span-3">
-                          <SelectValue placeholder="Seleccione un rol" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="admin">Admin</SelectItem>
-                          <SelectItem value="propietario">Propietario</SelectItem>
-                          <SelectItem value="conductor">Conductor</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    ) : key === "propietarioId" && formData.rol === "conductor" ? (
-                      <Select value={formData[key]} onValueChange={(value) => handleInputChange(key, value)}>
-                        <SelectTrigger className="col-span-3">
-                          <SelectValue placeholder="Seleccione un propietario" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {propietarios.map((prop) => (
-                            <SelectItem key={prop.id} value={prop.id}>
-                              {prop.nombre}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Input
-                        id={key}
-                        type={key === "password" ? "password" : "text"}
-                        value={formData[key]}
-                        onChange={(e) => handleInputChange(key, e.target.value)}
-                        className="col-span-3"
-                      />
-                    )}
-                  </div>
-                ))}
+              <div className="grid gap-4 py-4" id="dialog-description">
+                {Object.keys(formData).map((key) => {
+                  // No mostrar campos de bloqueo en el formulario de creación/edición
+                  if (
+                    key === "bloqueado" ||
+                    key === "motivoBloqueo" ||
+                    key === "fechaBloqueo" ||
+                    key === "numeroTarjetaRFID"
+                  ) {
+                    return null
+                  }
+
+                  // Si es propietarioId, solo mostrarlo cuando el rol es conductor
+                  if (key === "propietarioId" && formData.rol !== "conductor") {
+                    return null
+                  }
+
+                  return (
+                    <div key={key} className="grid grid-cols-4 items-center gap-4">
+                      <label htmlFor={key} className="text-right">
+                        {key.charAt(0).toUpperCase() + key.slice(1)}:
+                      </label>
+                      {key === "rol" ? (
+                        <Select value={formData[key]} onValueChange={(value) => handleInputChange(key, value)}>
+                          <SelectTrigger className="col-span-3">
+                            <SelectValue placeholder="Seleccione un rol" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="admin">Admin</SelectItem>
+                            <SelectItem value="propietario">Propietario</SelectItem>
+                            <SelectItem value="conductor">Conductor</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : key === "propietarioId" && formData.rol === "conductor" ? (
+                        <Select value={formData[key]} onValueChange={(value) => handleInputChange(key, value)}>
+                          <SelectTrigger className="col-span-3">
+                            <SelectValue placeholder="Seleccione un propietario" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {propietarios.map((prop) => (
+                              <SelectItem key={prop.id} value={prop.id}>
+                                {prop.nombre}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input
+                          id={key}
+                          type={key === "password" ? "password" : "text"}
+                          value={formData[key] || ""}
+                          onChange={(e) => handleInputChange(key, e.target.value)}
+                          className="col-span-3"
+                        />
+                      )}
+                    </div>
+                  )
+                })}
               </div>
               <DialogFooter>
                 <Button type="submit">{editMode ? "Guardar Cambios" : "Crear Usuario"}</Button>
@@ -639,10 +710,12 @@ export default function UserManagement() {
       </Dialog>
 
       <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
-        <DialogContent>
+        <DialogContent aria-describedby="delete-dialog-description">
           <DialogHeader>
             <DialogTitle>Confirmar Eliminación</DialogTitle>
-            <DialogDescription>¿Está seguro que desea eliminar al usuario "{selectedUser?.nombre}"?</DialogDescription>
+            <DialogDescription id="delete-dialog-description">
+              ¿Está seguro que desea eliminar al usuario "{selectedUser?.nombre}"?
+            </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDeleteModal(false)}>
@@ -657,4 +730,3 @@ export default function UserManagement() {
     </div>
   )
 }
-

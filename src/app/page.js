@@ -1,47 +1,44 @@
-"use client";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import Image from "next/image";
+"use client"
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+import Image from "next/image"
 
 export default function Page() {
-  const router = useRouter();
-  const [username, setUsername] = useState("");
-  const [correo, setCorreo] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [loginError, setLoginError] = useState(false);
+  const router = useRouter()
+  const [username, setUsername] = useState("")
+  const [correo, setCorreo] = useState("")
+  const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
+  const [loginError, setLoginError] = useState(false)
 
   const handleLogin = async () => {
     try {
-      const response = await fetch(
-        "https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/login",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ correo, username, password }),
-        }
-      );
+      const response = await fetch("https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ correo, username, password }),
+      })
 
       if (response.ok) {
-        const data = await response.json();
-        const { token, rol, idUser } = data;
+        const data = await response.json()
+        const { token, rol, idUser } = data
 
-        localStorage.setItem("token", token);
-        localStorage.setItem("rol", rol);
-        localStorage.setItem("idUser", idUser);
+        localStorage.setItem("token", token)
+        localStorage.setItem("rol", rol)
+        localStorage.setItem("idUser", idUser)
 
-        if (rol === "admin" || rol === "propietario" ||rol === "conductor" ) router.push("/Home");
+        if (rol === "admin" || rol === "propietario" || rol === "conductor") router.push("/Home")
       } else {
-        setLoginError(true);
+        setLoginError(true)
       }
     } catch (error) {
-      console.error("Error:", error);
-      setLoginError(true);
+      console.error("Error:", error)
+      setLoginError(true)
     }
-  };
+  }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-gray-100 to-gray-300">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#1a3a5f] to-[#0f2942]">
       <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-lg">
         {/* Logo */}
         <div className="flex justify-center mb-6">
@@ -49,9 +46,7 @@ export default function Page() {
         </div>
 
         {/* Título */}
-        <h1 className="text-3xl font-bold text-center text-gray-800 mb-6 font-inter">
-          Inicio de sesión
-        </h1>
+        <h1 className="text-3xl font-bold text-center text-gray-800 mb-6 font-inter">Inicio de sesión</h1>
 
         {/* Inputs */}
         <div className="space-y-4">
@@ -62,8 +57,8 @@ export default function Page() {
             className="w-full p-3 border border-gray-300 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
             value={username !== "" ? username : correo}
             onChange={(e) => {
-              setUsername(e.target.value);
-              setCorreo(e.target.value);
+              setUsername(e.target.value)
+              setCorreo(e.target.value)
             }}
           />
 
@@ -121,9 +116,7 @@ export default function Page() {
 
         {/* Mensaje de error */}
         {loginError && (
-          <p className="text-red-600 text-sm mt-3 text-center">
-             Credenciales incorrectas. Inténtalo nuevamente.
-          </p>
+          <p className="text-red-600 text-sm mt-3 text-center">Credenciales incorrectas. Inténtalo nuevamente.</p>
         )}
 
         {/* Botón de Iniciar Sesión */}
@@ -140,5 +133,5 @@ export default function Page() {
         </button>
       </div>
     </div>
-  );
+  )
 }

@@ -26,11 +26,12 @@ export default function OwnerPaymentsTable() {
   const router = useRouter()
 
   useEffect(() => {
-    const role = localStorage.getItem("rol")
-    if (role !== "propietario") {
-      router.push("/")
-      return
+    const role = localStorage.getItem("rol");
+    if (role !== "propietario" && role !== "conductor") {
+      router.push("/");
+      return;
     }
+
 
     const now = new Date()
     const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -118,7 +119,7 @@ export default function OwnerPaymentsTable() {
   return (
     <div className="container mx-auto px-4 pt-20 pb-8">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Pagos del Propietario</h1>
+        <h1 className="text-3xl font-bold">Pagos</h1>
         <Button onClick={() => setShowFilterDialog(true)}>
           <Filter className="mr-2 h-4 w-4" /> Filtrar por Fecha
         </Button>

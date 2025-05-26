@@ -18,7 +18,7 @@ export default function Page() {
         setToken(userToken);  // Establecer token en el estado
     }, []);
 
-    const apiUrl = userId ? `https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/perfil/${userId}` : "";
+    const apiUrl = userId ? `https://mi-backendsecond.onrender.com/perfil/${userId}` : "";
 
     useEffect(() => {
         if (userId && token) {

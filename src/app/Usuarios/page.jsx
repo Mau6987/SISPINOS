@@ -127,7 +127,7 @@ export default function UserManagement() {
 
   const fetchData = async () => {
     try {
-      const response = await fetch("https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/usuarios", {
+      const response = await fetch("https://mi-backendsecond.onrender.com/usuarios", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
 
@@ -173,7 +173,7 @@ export default function UserManagement() {
 
   const fetchPropietarios = async () => {
     try {
-      const response = await fetch("https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/propietarios", {
+      const response = await fetch("https://mi-backendsecond.onrender.com/propietarios", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
       if (response.ok) {
@@ -281,8 +281,8 @@ export default function UserManagement() {
 
     try {
       const url = editMode
-        ? `https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/usuarios/${selectedUser.id}`
-        : "https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/usuarios"
+        ? `https://mi-backendsecond.onrender.com/usuarios/${selectedUser.id}`
+        : "https://mi-backendsecond.onrender.com/usuarios"
 
       // Si estamos offline, actualizar la UI optimistamente
       if (!navigator.onLine) {
@@ -373,7 +373,7 @@ export default function UserManagement() {
       }
 
       const response = await fetch(
-        `https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/usuarios/${selectedUser.id}`,
+        `https://mi-backendsecond.onrender.com/usuarios/${selectedUser.id}`,
         {
           method: "DELETE",
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },

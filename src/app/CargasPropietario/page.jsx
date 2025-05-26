@@ -61,7 +61,7 @@ export default function WaterChargesOwner() {
       setLoading(true)
       const token = localStorage.getItem("token")
       const ownerId = localStorage.getItem("idUser")
-      const url = `https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/cargasPropietario/${ownerId}`
+      const url = `https://mi-backendsecond.onrender.com/cargasPropietario/${ownerId}`
 
       try {
         const response = await fetch(url, {

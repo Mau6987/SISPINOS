@@ -1,12 +1,11 @@
-
 "use client"
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { ChevronLeft, ChevronRight, Eye, FileText, CreditCard, Filter } from "lucide-react"
 
-import { Button } from "../../components/components/ui/button"
-import { Input } from "../../components/components/ui/input"
+import { Button } from "@/components/components/ui/button"
+import { Input } from "@/components/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/components/ui/dialog"
 import { Checkbox } from "@/components/components/ui/checkbox"
@@ -100,7 +99,7 @@ export default function ClientManagement() {
 
   const fetchData = async () => {
     try {
-      const response = await fetch("https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/usuarios", {
+      const response = await fetch("https://mi-backendsecond.onrender.com/usuarios", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
 
@@ -142,6 +141,30 @@ export default function ClientManagement() {
           })
         }
       }
+    }
+  }
+
+  // Función para obtener los datos completos de un usuario específico
+  const fetchUserById = async (userId) => {
+    try {
+      const response = await fetch(`https://mi-backendsecond.onrender.com/usuarios/${userId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      })
+
+      if (response.ok) {
+        const userData = await response.json()
+        return userData
+      } else {
+        throw new Error("Error al obtener los datos del usuario")
+      }
+    } catch (error) {
+      console.error("Error al obtener usuario por ID:", error)
+      // Si falla la petición, buscar en los datos locales
+      const user = allUsers.find((u) => u.id === userId)
+      if (user) {
+        return user
+      }
+      throw error
     }
   }
 
@@ -207,25 +230,50 @@ export default function ClientManagement() {
         return Promise.resolve() // Resolver la promesa para la UI
       }
 
-      const response = await fetch(`https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/usuarios/${userId}`, {
+      // Obtener los datos completos del usuario
+      const userData = await fetchUserById(userId)
+
+      // Preparar los datos completos con solo el RFID modificado
+      const updatedUserData = {
+        nombre: userData.nombre,
+        correo: userData.correo,
+        ci: userData.ci,
+        username: userData.username,
+        // No enviamos password para mantener la actual
+        rol: userData.rol,
+        numeroTarjetaRFID: cardNumber, // Solo este campo cambia
+        propietarioId: userData.propietarioId,
+        bloqueado: userData.bloqueado,
+        motivoBloqueo: userData.motivoBloqueo,
+      }
+
+      // Enviar la actualización con todos los campos
+      const response = await fetch(`https://mi-backendsecond.onrender.com/usuarios/${userId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-        body: JSON.stringify({ numeroTarjetaRFID: cardNumber }),
+        body: JSON.stringify(updatedUserData),
       })
 
       if (response.ok) {
-        fetchData() // Actualizar datos desde el servidor
+        // Actualizar los datos locales inmediatamente
+        setAllUsers((prevUsers) =>
+          prevUsers.map((user) => (user.id === userId ? { ...user, numeroTarjetaRFID: cardNumber } : user)),
+        )
+
+        // También recargar desde el servidor para asegurar sincronización
+        fetchData()
         return Promise.resolve()
       } else {
         const errorData = await response.json().catch(() => ({}))
+        console.error("Error del servidor:", errorData)
         return Promise.reject(errorData.message || "Error al actualizar la tarjeta")
       }
     } catch (error) {
       console.error("Error al actualizar la tarjeta RFID:", error)
-      return Promise.reject("Error de conexión")
+      return Promise.reject(error.message || "Error de conexión")
     }
   }
 
@@ -255,8 +303,8 @@ export default function ClientManagement() {
       }
 
       const url = blocked
-        ? `https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/usuarios/${userId}/bloquear`
-        : `https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/usuarios/${userId}/desbloquear`
+        ? `https://mi-backendsecond.onrender.com/usuarios/${userId}/bloquear`
+        : `https://mi-backendsecond.onrender.com/usuarios/${userId}/desbloquear`
 
       const response = await fetch(url, {
         method: "POST",

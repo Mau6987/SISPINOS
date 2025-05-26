@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useEffect } from "react"
@@ -65,7 +64,7 @@ export default function PagoCargaAgua() {
 
   const fetchUsuarios = async () => {
     try {
-      const response = await fetch("https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/usuariosrol", {
+      const response = await fetch("https://mi-backendsecond.onrender.com/usuariosrol", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
       if (response.ok) {
@@ -79,7 +78,7 @@ export default function PagoCargaAgua() {
 
   const fetchPagos = async () => {
     try {
-      const response = await fetch("https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/pagoscargagua", {
+      const response = await fetch("https://mi-backendsecond.onrender.com/pagoscargagua", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
       if (response.ok) {
@@ -93,12 +92,9 @@ export default function PagoCargaAgua() {
 
   const fetchCargasDeuda = async (usuarioId) => {
     try {
-      const response = await fetch(
-        `https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/cargasPropietarioDeuda/${usuarioId}`,
-        {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        },
-      )
+      const response = await fetch(`https://mi-backendsecond.onrender.com/cargasPropietarioDeuda/${usuarioId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      })
       if (response.ok) {
         const data = await response.json()
         setCargasDeuda(data)
@@ -152,12 +148,9 @@ export default function PagoCargaAgua() {
 
   const handleVerPago = async (pago) => {
     try {
-      const response = await fetch(
-        `https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/pagoscargagua/${pago.id}`,
-        {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        },
-      )
+      const response = await fetch(`https://mi-backendsecond.onrender.com/pagoscargagua/${pago.id}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      })
       if (response.ok) {
         const data = await response.json()
         setSelectedPago(data)
@@ -171,12 +164,9 @@ export default function PagoCargaAgua() {
 
   const handleEditPago = async (pago) => {
     try {
-      const response = await fetch(
-        `https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/pagoscargagua/${pago.id}`,
-        {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        },
-      )
+      const response = await fetch(`https://mi-backendsecond.onrender.com/pagoscargagua/${pago.id}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      })
       if (response.ok) {
         const data = await response.json()
         setSelectedPago(data)
@@ -195,13 +185,10 @@ export default function PagoCargaAgua() {
 
   const handleDeletePago = async (pagoId) => {
     try {
-      const response = await fetch(
-        `https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/pagoscargagua/${pagoId}`,
-        {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        },
-      )
+      const response = await fetch(`https://mi-backendsecond.onrender.com/pagoscargagua/${pagoId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      })
       if (response.ok) {
         setPagos(pagos.filter((pago) => pago.id !== pagoId))
         setShowDeleteModal(false)
@@ -227,8 +214,8 @@ export default function PagoCargaAgua() {
 
     try {
       const url = editMode
-        ? `https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/pagoscargagua/${selectedPago.id}`
-        : "https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/pagoscargagua"
+        ? `https://mi-backendsecond.onrender.com/pagoscargagua/${selectedPago.id}`
+        : "https://mi-backendsecond.onrender.com/pagoscargagua"
 
       const method = editMode ? "PUT" : "POST"
 
@@ -314,11 +301,10 @@ export default function PagoCargaAgua() {
                       <strong>ID:</strong> {pago.id}
                     </p>
                     <p>
-                      <strong>Usuario:</strong>{" "}
-                      {usuarios.find((usuario) => usuario.id === pago.usuarioId)?.username || "N/A"}
+                      <strong>Usuario:</strong> {pago.usuario?.nombre || pago.usuario?.username || "N/A"}
                     </p>
                     <p>
-                      <strong>Monto:</strong> ${pago.monto}
+                      <strong>Monto:</strong> Bs {pago.monto}
                     </p>
                     <p>
                       <strong>Fecha:</strong> {new Date(pago.fechaHora).toLocaleString()}
@@ -371,10 +357,8 @@ export default function PagoCargaAgua() {
                 {currentPagos.map((pago) => (
                   <TableRow key={pago.id}>
                     <TableCell>{pago.id}</TableCell>
-                    <TableCell>
-                      {usuarios.find((usuario) => usuario.id === pago.usuarioId)?.username || "N/A"}
-                    </TableCell>
-                    <TableCell>${pago.monto}</TableCell>
+                    <TableCell>{pago.usuario?.nombre || pago.usuario?.username || "N/A"}</TableCell>
+                    <TableCell>Bs {pago.monto}</TableCell>
                     <TableCell>{new Date(pago.fechaHora).toLocaleString()}</TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
@@ -445,12 +429,12 @@ export default function PagoCargaAgua() {
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <span className="font-medium">Monto:</span>
-                <span className="col-span-3">${selectedPago.monto}</span>
+                <span className="col-span-3">Bs {selectedPago.monto}</span>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <span className="font-medium">Usuario:</span>
                 <span className="col-span-3">
-                  {usuarios.find((usuario) => usuario.id === selectedPago.usuarioId)?.username || "N/A"}
+                  {selectedPago.usuario?.nombre || selectedPago.usuario?.username || "N/A"}
                 </span>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
@@ -506,7 +490,7 @@ export default function PagoCargaAgua() {
                               onCheckedChange={() => handleCargaToggle(carga.id)}
                             />
                             <label htmlFor={`carga-${carga.id}`} className="flex-1 cursor-pointer text-sm">
-                              Carga #{carga.id} - Costo: ${carga.costo || 30} - Fecha:{" "}
+                              Carga #{carga.id} - Costo: Bs {carga.costo || 30} - Fecha:{" "}
                               {new Date(carga.fechaHora).toLocaleDateString()}
                             </label>
                           </div>
@@ -523,7 +507,7 @@ export default function PagoCargaAgua() {
                             return (
                               <Badge key={id} variant="outline" className="px-2 py-1 flex items-center gap-1">
                                 <span>
-                                  Carga #{id} - ${carga?.costo || 30}
+                                  Carga #{id} - Bs {carga?.costo || 30}
                                 </span>
                                 <button
                                   type="button"
@@ -632,4 +616,3 @@ export default function PagoCargaAgua() {
     </div>
   )
 }
-

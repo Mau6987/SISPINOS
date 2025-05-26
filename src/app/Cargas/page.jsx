@@ -54,6 +54,26 @@ export default function Page() {
   const [selectedStatus, setSelectedStatus] = useState([])
   const [truckTypes, setTruckTypes] = useState([])
   const [users, setUsers] = useState([])
+  const [currentPrice, setCurrentPrice] = useState(30) // Default fallback
+
+  const fetchCurrentPrice = async () => {
+    try {
+      const response = await fetch("https://mi-backendsecond.onrender.com/precios", {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      })
+      if (response.ok) {
+        const data = await response.json()
+        // Find the active price (should be the first one since they're ordered by creation date DESC)
+        const activePrice = data.find((price) => price.activo === true)
+        if (activePrice) {
+          setCurrentPrice(activePrice.valor)
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching current price:", error)
+      // Keep default value of 30 if fetch fails
+    }
+  }
 
   useEffect(() => {
     const role = localStorage.getItem("rol")
@@ -63,12 +83,13 @@ export default function Page() {
       fetchWaterCharges()
       fetchTruckTypes()
       fetchUsers()
+      fetchCurrentPrice() // Add this line
     }
   }, [router])
 
   const fetchWaterCharges = async () => {
     try {
-      const response = await fetch("https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/cargagua", {
+      const response = await fetch("https://mi-backendsecond.onrender.com/cargagua", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
       if (response.ok) {
@@ -86,7 +107,7 @@ export default function Page() {
 
   const fetchTruckTypes = async () => {
     try {
-      const response = await fetch("https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/tiposDeCamion", {
+      const response = await fetch("https://mi-backendsecond.onrender.com/tiposDeCamion", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
       if (response.ok) {
@@ -100,7 +121,7 @@ export default function Page() {
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch("https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/usuariosrol", {
+      const response = await fetch("https://mi-backendsecond.onrender.com/usuariosrol", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
       if (response.ok) {
@@ -114,7 +135,7 @@ export default function Page() {
 
   const handleViewCharge = async (charge) => {
     try {
-      const response = await fetch(`https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/cargagua/${charge.id}`, {
+      const response = await fetch(`https://mi-backendsecond.onrender.com/cargagua/${charge.id}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
       if (response.ok) {
@@ -149,13 +170,13 @@ export default function Page() {
           estado: "deuda",
           usuarioId: Number.parseInt(e.target.usuarioId.value),
           tipoCamionId: Number.parseInt(e.target.tipoCamionId.value),
-          costo: Number.parseInt(e.target.costo.value || "30"),
+          costo: currentPrice, // Always use current price, don't read from form
         }
 
     try {
       const url = editMode
-        ? `https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/cargagua/${selectedCharge.id}`
-        : "https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/cargagua"
+        ? `https://mi-backendsecond.onrender.com/cargagua/${selectedCharge.id}`
+        : "https://mi-backendsecond.onrender.com/cargagua"
       const method = editMode ? "PUT" : "POST"
 
       const response = await fetch(url, {
@@ -178,13 +199,10 @@ export default function Page() {
 
   const handleDeleteCharge = async () => {
     try {
-      const response = await fetch(
-        `https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/cargagua/${selectedCharge.id}`,
-        {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        },
-      )
+      const response = await fetch(`https://mi-backendsecond.onrender.com/cargagua/${selectedCharge.id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      })
       if (response.ok) {
         setShowDeleteModal(false)
         fetchWaterCharges()
@@ -316,7 +334,7 @@ export default function Page() {
                     <TableCell>{new Date(charge.fechaHora).toLocaleString()}</TableCell>
                     <TableCell>{charge.estado}</TableCell>
                     <TableCell>{charge.usuario?.nombre || "N/A"}</TableCell>
-                    <TableCell>{charge.costo || 30}</TableCell>
+                    <TableCell>{charge.costo || currentPrice}</TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
                         <Button
@@ -398,7 +416,7 @@ export default function Page() {
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <span className="font-medium">Costo:</span>
-                <span className="col-span-3">{selectedCharge.costo || 30}</span>
+                <span className="col-span-3">{selectedCharge.costo || currentPrice}</span>
               </div>
             </div>
           ) : (
@@ -465,9 +483,9 @@ export default function Page() {
                     id="costo"
                     name="costo"
                     type="number"
-                    defaultValue={selectedCharge?.costo || "30"}
-                    className="col-span-3"
-                    required
+                    value={selectedCharge?.costo || currentPrice.toString()}
+                    className="col-span-3 bg-gray-100 cursor-not-allowed"
+                    readOnly
                   />
                 </div>
               </div>
@@ -498,4 +516,3 @@ export default function Page() {
     </div>
   )
 }
-

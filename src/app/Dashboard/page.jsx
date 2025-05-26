@@ -69,7 +69,7 @@ const Dashboard = () => {
         case "distribucionCargas":
         case "topUsuarios":
         case "cargasPorDia":
-          response = await fetch("https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/consultacargas", {
+          response = await fetch("https://mi-backendsecond.onrender.com/consultacargas", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -83,7 +83,7 @@ const Dashboard = () => {
           }
           break
         case "topPagadores":
-          response = await fetch("https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/consultapagos", {
+          response = await fetch("https://mi-backendsecond.onrender.com/consultapagos", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",

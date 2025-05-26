@@ -18,7 +18,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "../../components/compon
 import { Badge } from "../../components/components/ui/badge"
 import { ScrollArea } from "../../components/components/ui/scroll-area"
 
-const URL = "https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/"
+const URL = "https://mi-backendsecond.onrender.com/"
 
 export default function TableConsultas() {
   const router = useRouter()

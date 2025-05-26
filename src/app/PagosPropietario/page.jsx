@@ -43,7 +43,7 @@ export default function OwnerPaymentsTable() {
       setLoading(true)
       const token = localStorage.getItem("token")
       const ownerId = localStorage.getItem("idUser")
-      const url = `https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/pagosPropietario/${ownerId}`
+      const url = `https://mi-backendsecond.onrender.com/pagosPropietario/${ownerId}`
 
       try {
         const response = await fetch(url, {

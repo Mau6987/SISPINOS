@@ -43,7 +43,7 @@ export default function OwnerDriversTable() {
       setLoading(true)
       const token = localStorage.getItem("token")
       const ownerId = localStorage.getItem("idUser")
-      const url = `https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/conductores/${ownerId}`
+      const url = `https://mi-backendsecond.onrender.com/conductores/${ownerId}`
 
       try {
         const response = await fetch(url, {
@@ -74,7 +74,7 @@ export default function OwnerDriversTable() {
   const handleViewCharges = async (driverId) => {
     setLoading(true)
     const token = localStorage.getItem("token")
-    const url = `https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/cargascliente/${driverId}`
+    const url = `https://mi-backendsecond.onrender.com/cargascliente/${driverId}`
 
     try {
       const response = await fetch(url, {
@@ -96,7 +96,7 @@ export default function OwnerDriversTable() {
   const handleViewPayments = async (driverId) => {
     setLoading(true)
     const token = localStorage.getItem("token")
-    const url = `https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/pagoscliente/${driverId}`
+    const url = `https://mi-backendsecond.onrender.com/pagoscliente/${driverId}`
 
     try {
       const response = await fetch(url, {

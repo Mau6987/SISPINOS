@@ -1,4 +1,4 @@
-    "use client"
+"use client"
 
 import { useState } from "react"
 import { CreditCard, Save, X } from "lucide-react"
@@ -23,7 +23,7 @@ export default function RFIDCardManager({ userId, userName, currentCardNumber, o
 
     try {
       setIsVerifying(true)
-      const response = await fetch("https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/verificartarjeta", {
+      const response = await fetch("https://mi-backendsecond.onrender.com/verificartarjeta", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

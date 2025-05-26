@@ -78,13 +78,18 @@ export default function Navbar() {
               { href: "/UsuariosCliente", icon: User, title: "Gestión de Clientes" },
             ]}
           />
-          <NavLink href="/Cargas" icon={Package}>
-            Gestión de Carga de Agua
-          </NavLink>
+         <SubMenu
+            title="Cargas de agua"
+            icon={CreditCard}
+            items={[
+              { href: "/Cargas", icon: CreditCard, title: "Gestion de cargas" },
+              { href: "/PrecioCarga", icon: CreditCard, title: "Precio de cargas" },
+            ]}
+          />
           <NavLink href="/Pagos" icon={CreditCard}>
             Gestión de Pagos
           </NavLink>
-          <NavLink href="/Dashboard" icon={CreditCard}>
+          <NavLink href="/Reportes" icon={CreditCard}>
             Reportes
           </NavLink>
         </>

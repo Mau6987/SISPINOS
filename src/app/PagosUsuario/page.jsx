@@ -125,7 +125,7 @@ export default function UsuarioDetalles() {
 
   const fetchUsuarios = async () => {
     try {
-      const response = await fetch("https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/usuarios", {
+      const response = await fetch("https://mi-backendsecond.onrender.com/usuarios", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
       if (response.ok) {
@@ -141,7 +141,7 @@ export default function UsuarioDetalles() {
 
   const fetchConductores = async (propietarioId) => {
     try {
-      const response = await fetch("https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/usuarios", {
+      const response = await fetch("https://mi-backendsecond.onrender.com/usuarios", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
       if (response.ok) {
@@ -166,11 +166,11 @@ export default function UsuarioDetalles() {
         // Si estamos consultando las cargas del propietario
         endpoint =
           usuarioSeleccionado?.rol === "propietario"
-            ? `https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/cargasPropietario/${usuarioId}`
-            : `https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/cargascliente/${usuarioId}`
+            ? `https://mi-backendsecond.onrender.com/cargasPropietario/${usuarioId}`
+            : `https://mi-backendsecond.onrender.com/cargascliente/${usuarioId}`
       } else {
         // Si estamos consultando las cargas de un conductor específico
-        endpoint = `https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/cargascliente/${usuarioId}`
+        endpoint = `https://mi-backendsecond.onrender.com/cargascliente/${usuarioId}`
       }
 
       const response = await fetch(endpoint, {
@@ -222,7 +222,7 @@ export default function UsuarioDetalles() {
     try {
       // Primero obtenemos las cargas del propietario
       const responsePropietario = await fetch(
-        `https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/cargasPropietario/${propietarioId}`,
+        `https://mi-backendsecond.onrender.com/cargasPropietario/${propietarioId}`,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         },
@@ -243,7 +243,7 @@ export default function UsuarioDetalles() {
       }
 
       // Luego obtenemos los conductores del propietario
-      const responseConductores = await fetch("https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/usuarios", {
+      const responseConductores = await fetch("https://mi-backendsecond.onrender.com/usuarios", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
 
@@ -255,12 +255,9 @@ export default function UsuarioDetalles() {
 
         // Para cada conductor, obtenemos sus cargas
         for (const conductor of conductoresFiltrados) {
-          const responseConductor = await fetch(
-            `https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/cargascliente/${conductor.id}`,
-            {
-              headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-            },
-          )
+          const responseConductor = await fetch(`https://mi-backendsecond.onrender.com/cargascliente/${conductor.id}`, {
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+          })
 
           if (responseConductor.ok) {
             const cargasConductor = await responseConductor.json()
@@ -384,7 +381,7 @@ export default function UsuarioDetalles() {
     }
 
     try {
-      const response = await fetch("https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/pagoscargagua", {
+      const response = await fetch("https://mi-backendsecond.onrender.com/pagoscargagua", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -476,7 +473,7 @@ export default function UsuarioDetalles() {
 
   const fetchChargeDetails = async (chargeId) => {
     try {
-      const response = await fetch(`https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/cargagua/${chargeId}`, {
+      const response = await fetch(`https://mi-backendsecond.onrender.com/cargagua/${chargeId}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
       if (response.ok) {
@@ -695,7 +692,8 @@ export default function UsuarioDetalles() {
                         <strong>Costo:</strong> Bs{carga.costo || 30}
                       </p>
                       <p>
-                        <strong>Usuario:</strong> {carga.usuario?.nombre || carga.conductorNombre || "N/A"}
+                        <strong>Usuario:</strong>{" "}
+                        {carga.usuario?.nombre || carga.usuario?.username || carga.conductorNombre || "N/A"}
                       </p>
                       <p>
                         <strong>Tipo:</strong>{" "}
@@ -796,7 +794,9 @@ export default function UsuarioDetalles() {
                           </Badge>
                         </TableCell>
                         <TableCell className="border-0 py-3">Bs{carga.costo || 30}</TableCell>
-                        <TableCell className="border-0 py-3">{carga.usuario?.nombre || "N/A"}</TableCell>
+                        <TableCell className="border-0 py-3">
+                          {carga.usuario?.nombre || carga.usuario?.username || carga.conductorNombre || "N/A"}
+                        </TableCell>
                         <TableCell className="border-0 py-3">
                           <div className="flex space-x-2">
                             <Button

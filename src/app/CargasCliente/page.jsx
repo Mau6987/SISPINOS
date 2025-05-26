@@ -67,7 +67,7 @@ export default function WaterChargesClient() {
         return
       }
 
-      const url = `https://xvxsfhnjxj.execute-api.us-east-1.amazonaws.com/dev/cargascliente/${userId}`
+      const url = `https://mi-backendsecond.onrender.com/cargascliente/${userId}`
 
       try {
         const response = await fetch(url, {

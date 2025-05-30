@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Filter, Calendar, DollarSign, CreditCard, ChevronLeft, ChevronRight } from "lucide-react"
+import { Filter, Calendar, DollarSign, CreditCard, ChevronLeft, ChevronRight, Download, Receipt } from "lucide-react"
 import Swal from "sweetalert2"
+import { jsPDF } from "jspdf"
 import { Button } from "../../components/components/ui/button"
 import { Input } from "../../components/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/components/ui/table"
@@ -20,9 +21,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "../../comp
 import { Badge } from "../../components/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "../../components/components/ui/avatar"
 import { Label } from "../../components/components/ui/label"
-
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/components/ui/tabs"
 import { Checkbox } from "../../components/components/ui/checkbox"
+
 const useWindowWidth = () => {
   const [windowWidth, setWindowWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 0)
 
@@ -43,7 +44,7 @@ export default function UsuarioDetalles() {
   // Estados para el usuario
   const [usuarios, setUsuarios] = useState([])
   const [usuarioSeleccionado, setUsuarioSeleccionado] = useState(null)
-  const [mostrarSelect, setMostrarSelect] = useState(false) // Cambiado a false por defecto
+  const [mostrarSelect, setMostrarSelect] = useState(false)
   const [conductores, setConductores] = useState([])
   const [conductorSeleccionado, setConductorSeleccionado] = useState(null)
   const [activeTab, setActiveTab] = useState("propietario")
@@ -59,6 +60,8 @@ export default function UsuarioDetalles() {
   // Estados para el pago
   const [numeroCargasAPagar, setNumeroCargasAPagar] = useState(1)
   const [showPaymentDialog, setShowPaymentDialog] = useState(false)
+  const [showReceiptDialog, setShowReceiptDialog] = useState(false)
+  const [pagoRealizado, setPagoRealizado] = useState(null)
 
   // Estados para filtros
   const [filtroEstado, setFiltroEstado] = useState("")
@@ -70,14 +73,10 @@ export default function UsuarioDetalles() {
   const [fechaFin, setFechaFin] = useState(() => new Date().toISOString().split("T")[0])
   const [showFilterDialog, setShowFilterDialog] = useState(false)
 
-  // Añadir después de los otros estados
+  // Estados adicionales
   const [showChargeDetailsDialog, setShowChargeDetailsDialog] = useState(false)
   const [selectedCharge, setSelectedCharge] = useState(null)
-
-  // Añadir un nuevo estado para controlar si los filtros están activos
   const [filtrosActivos, setFiltrosActivos] = useState(false)
-
-  // Añadir un nuevo estado para almacenar todas las cargas combinadas
   const [todasLasCargas, setTodasLasCargas] = useState([])
   const [todasLasCargasDeuda, setTodasLasCargasDeuda] = useState([])
   const [totalTodasCargas, setTotalTodasCargas] = useState(0)
@@ -94,15 +93,10 @@ export default function UsuarioDetalles() {
     } else {
       fetchUsuarios()
 
-      // Obtener el ID del usuario desde localStorage
       const selectedUserId = localStorage.getItem("selectedUserId")
-
-      // Si hay un ID de usuario en localStorage, cargarlo automáticamente
       if (selectedUserId) {
         setAutoLoadUserId(selectedUserId)
-        // No eliminamos el ID para mantener la selección entre visitas
       } else {
-        // Si no hay ID en localStorage, mostrar el select
         setMostrarSelect(true)
       }
     }
@@ -113,12 +107,11 @@ export default function UsuarioDetalles() {
       const user = usuarios.find((u) => u.id.toString() === autoLoadUserId.toString())
       if (user) {
         handleUsuarioChange(user.id.toString())
-        setAutoLoadUserId(null) // Clear it after use
+        setAutoLoadUserId(null)
       }
     }
   }, [usuarios, autoLoadUserId])
 
-  // Resetear la paginación cuando cambian los datos
   useEffect(() => {
     setCurrentPage(1)
   }, [cargas, filtroEstado, fechaInicio, fechaFin, filtrosActivos])
@@ -130,7 +123,6 @@ export default function UsuarioDetalles() {
       })
       if (response.ok) {
         const data = await response.json()
-        // Filtrar solo propietarios y conductores
         const filteredUsers = data.filter((user) => user.rol === "propietario" || user.rol === "conductor")
         setUsuarios(filteredUsers)
       }
@@ -146,7 +138,6 @@ export default function UsuarioDetalles() {
       })
       if (response.ok) {
         const data = await response.json()
-        // Filtrar conductores que pertenecen al propietario seleccionado
         const conductoresFiltrados = data.filter(
           (user) => user.rol === "conductor" && user.propietarioId === propietarioId,
         )
@@ -159,17 +150,14 @@ export default function UsuarioDetalles() {
 
   const fetchCargasUsuario = async (usuarioId, esPropio = true) => {
     try {
-      // Determinar el endpoint según el rol del usuario
       let endpoint = ""
 
       if (esPropio) {
-        // Si estamos consultando las cargas del propietario
         endpoint =
           usuarioSeleccionado?.rol === "propietario"
             ? `https://mi-backendsecond.onrender.com/cargasPropietario/${usuarioId}`
             : `https://mi-backendsecond.onrender.com/cargascliente/${usuarioId}`
       } else {
-        // Si estamos consultando las cargas de un conductor específico
         endpoint = `https://mi-backendsecond.onrender.com/cargascliente/${usuarioId}`
       }
 
@@ -178,16 +166,13 @@ export default function UsuarioDetalles() {
       })
       if (response.ok) {
         const data = await response.json()
-        // Ordenar por fecha (más antiguas primero)
         data.sort((a, b) => new Date(a.fechaHora) - new Date(b.fechaHora))
         setCargas(data)
         setTotalCargas(data.length)
 
-        // Filtrar cargas con deuda
         const deudas = data.filter((carga) => carga.estado === "deuda")
         setCargasDeuda(deudas)
 
-        // Calcular total de deuda
         const totalDeudaCalculado = deudas.reduce((total, carga) => total + (carga.costo || 30), 0)
         setTotalDeuda(totalDeudaCalculado)
       }
@@ -196,31 +181,22 @@ export default function UsuarioDetalles() {
     }
   }
 
-  // Modificar la función handleUsuarioChange para cargar todas las cargas cuando es propietario
   const handleUsuarioChange = async (id) => {
     const usuario = usuarios.find((u) => u.id.toString() === id)
     setUsuarioSeleccionado(usuario)
     setMostrarSelect(false)
 
-    // If it's a property owner, load their drivers
     if (usuario.rol === "propietario") {
       await fetchConductores(usuario.id)
       setActiveTab("propietario")
-
-      // Load all charges (owner + drivers) - this single call will update all necessary states
       await fetchTodasLasCargas(usuario.id)
-
-      // Don't call fetchCargasUsuario since fetchTodasLasCargas already updates the states
     } else {
-      // For non-owners, just fetch their charges directly
       await fetchCargasUsuario(id)
     }
   }
 
-  // Añadir una nueva función para cargar todas las cargas
   const fetchTodasLasCargas = async (propietarioId) => {
     try {
-      // Primero obtenemos las cargas del propietario
       const responsePropietario = await fetch(
         `https://mi-backendsecond.onrender.com/cargasPropietario/${propietarioId}`,
         {
@@ -228,12 +204,10 @@ export default function UsuarioDetalles() {
         },
       )
 
-      // Usar un Map para evitar duplicados, usando el ID como clave
       const cargasMap = new Map()
 
       if (responsePropietario.ok) {
         const cargasPropietario = await responsePropietario.json()
-        // Añadir información para identificar que estas cargas son del propietario
         cargasPropietario.forEach((carga) => {
           cargasMap.set(carga.id, {
             ...carga,
@@ -242,7 +216,6 @@ export default function UsuarioDetalles() {
         })
       }
 
-      // Luego obtenemos los conductores del propietario
       const responseConductores = await fetch("https://mi-backendsecond.onrender.com/usuarios", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
@@ -253,7 +226,6 @@ export default function UsuarioDetalles() {
           (user) => user.rol === "conductor" && user.propietarioId === propietarioId,
         )
 
-        // Para cada conductor, obtenemos sus cargas
         for (const conductor of conductoresFiltrados) {
           const responseConductor = await fetch(`https://mi-backendsecond.onrender.com/cargascliente/${conductor.id}`, {
             headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -261,9 +233,7 @@ export default function UsuarioDetalles() {
 
           if (responseConductor.ok) {
             const cargasConductor = await responseConductor.json()
-            // Añadir información del conductor a cada carga
             cargasConductor.forEach((carga) => {
-              // Solo añadir si no existe ya en el Map
               if (!cargasMap.has(carga.id)) {
                 cargasMap.set(carga.id, {
                   ...carga,
@@ -277,24 +247,18 @@ export default function UsuarioDetalles() {
         }
       }
 
-      // Convertir el Map a un array y ordenar por fecha
       const todasCargas = Array.from(cargasMap.values())
       todasCargas.sort((a, b) => new Date(a.fechaHora) - new Date(b.fechaHora))
 
-      // Actualizar los estados con todas las cargas combinadas
       setTodasLasCargas(todasCargas)
       setTotalTodasCargas(todasCargas.length)
-
-      // Actualizar también los estados principales para mostrar en la interfaz
       setCargas(todasCargas)
       setTotalCargas(todasCargas.length)
 
-      // Filtrar cargas con deuda
       const deudas = todasCargas.filter((carga) => carga.estado === "deuda")
       setTodasLasCargasDeuda(deudas)
       setCargasDeuda(deudas)
 
-      // Calcular total de deuda
       const totalDeudaCalculado = deudas.reduce((total, carga) => total + (carga.costo || 30), 0)
       setTotalTodasDeuda(totalDeudaCalculado)
       setTotalDeuda(totalDeudaCalculado)
@@ -312,13 +276,11 @@ export default function UsuarioDetalles() {
     await fetchCargasUsuario(id, false)
   }
 
-  // Modificar la función handleTabChange para incluir la pestaña "todas"
   const handleTabChange = async (value) => {
     setActiveTab(value)
 
     if (value === "propietario") {
       setConductorSeleccionado(null)
-      // Use the already loaded data instead of fetching again
       setCargas(todasLasCargas)
       setTotalCargas(totalTodasCargas)
       setCargasDeuda(todasLasCargasDeuda)
@@ -328,7 +290,6 @@ export default function UsuarioDetalles() {
     }
   }
 
-  // Modificar la función handleCambiarUsuario para redirigir a /UsuariosCliente
   const handleCambiarUsuario = () => {
     router.push("/UsuariosCliente")
   }
@@ -337,15 +298,136 @@ export default function UsuarioDetalles() {
     const num = Number.parseInt(e.target.value)
     if (num > 0 && num <= cargasDeuda.length) {
       setNumeroCargasAPagar(num)
-
-      // Calcular monto total basado en las cargas más antiguas
       const cargasAPagar = cargasDeuda.slice(0, num)
       const monto = cargasAPagar.reduce((total, carga) => total + (carga.costo || 30), 0)
       setMontoTotal(monto)
     }
   }
 
-  // Modificar la función handlePagar para manejar pagos desde la vista "todas"
+  // Función para generar número de recibo
+  const generarNumeroRecibo = (pagoId, usuarioCI) => {
+    const ci = usuarioCI || "000000"
+    return `R${ci}${pagoId}`
+  }
+
+  // Función para generar PDF del recibo
+  const generarPDFRecibo = (datosRecibo) => {
+    const doc = new jsPDF()
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const margin = 20
+
+    // Colores
+    const azulOscuro = [0, 51, 102]
+    const grisClaro = [240, 240, 240]
+    const negro = [0, 0, 0]
+
+    // Encabezado con logo y título
+    doc.setFillColor(...grisClaro)
+    doc.rect(0, 0, pageWidth, 40, "F")
+
+    // Logo/Título de la empresa
+    doc.setFontSize(20)
+    doc.setTextColor(...azulOscuro)
+    doc.setFont("helvetica", "bold")
+    doc.text("DISTRIBUIDORA DE AGUA", pageWidth / 2, 15, { align: "center" })
+    doc.text("LOS PINOS", pageWidth / 2, 25, { align: "center" })
+
+    doc.setFontSize(12)
+    doc.setFont("helvetica", "normal")
+    doc.text("Servicio de distribución de agua potable", pageWidth / 2, 32, { align: "center" })
+
+    // Línea separadora
+    doc.setDrawColor(...azulOscuro)
+    doc.setLineWidth(1)
+    doc.line(margin, 45, pageWidth - margin, 45)
+
+    // Título del recibo
+    doc.setFontSize(16)
+    doc.setFont("helvetica", "bold")
+    doc.setTextColor(...negro)
+    doc.text("COMPROBANTE DE PAGO", pageWidth / 2, 60, { align: "center" })
+
+    // Información del recibo
+    let yPos = 80
+    const lineHeight = 8
+    const labelWidth = 60
+
+    const campos = [
+      { label: "Número de Recibo:", valor: datosRecibo.numeroRecibo },
+      { label: "Fecha y hora:", valor: datosRecibo.fechaHora },
+      { label: "Cliente:", valor: datosRecibo.cliente },
+      { label: "Tipo de cliente:", valor: datosRecibo.tipoCliente },
+      { label: "Número de cargas:", valor: datosRecibo.numeroCargas.toString() },
+      { label: "Importe total:", valor: `Bs ${datosRecibo.montoTotal.toFixed(2)}` },
+      { label: "Moneda:", valor: "BOLIVIANOS" },
+      { label: "Método de pago:", valor: "Sistema de pagos Los Pinos" },
+    ]
+
+    // Dibujar recuadro para la información
+    doc.setDrawColor(...azulOscuro)
+    doc.setLineWidth(0.5)
+    doc.rect(margin, yPos - 5, pageWidth - 2 * margin, campos.length * lineHeight + 10)
+
+    campos.forEach((campo, index) => {
+      doc.setFont("helvetica", "bold")
+      doc.setFontSize(10)
+      doc.text(campo.label, margin + 5, yPos)
+
+      doc.setFont("helvetica", "normal")
+      doc.text(campo.valor, margin + labelWidth, yPos)
+
+      yPos += lineHeight
+    })
+
+    // Detalle de cargas pagadas
+    yPos += 15
+    doc.setFont("helvetica", "bold")
+    doc.setFontSize(12)
+    doc.text("DETALLE DE CARGAS PAGADAS:", margin, yPos)
+
+    yPos += 10
+    doc.setFont("helvetica", "normal")
+    doc.setFontSize(9)
+
+    datosRecibo.cargasDetalle.forEach((carga, index) => {
+      const fechaCarga = new Date(carga.fechaHora).toLocaleDateString("es-ES", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      })
+      const horaCarga = new Date(carga.fechaHora).toLocaleTimeString("es-ES", {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+      const usuarioCarga = carga.usuario?.nombre || carga.usuario?.username || "N/A"
+
+      doc.text(`${index + 1}. Carga #${carga.id}`, margin + 5, yPos)
+      yPos += 4
+      doc.text(`   Fecha: ${fechaCarga} a las ${horaCarga}`, margin + 5, yPos)
+      yPos += 4
+      doc.text(`   Usuario: ${usuarioCarga}`, margin + 5, yPos)
+      yPos += 4
+      doc.text(`   Costo: Bs ${carga.costo}`, margin + 5, yPos)
+      yPos += 8
+    })
+
+    // Pie del recibo
+    yPos += 20
+    doc.setDrawColor(...azulOscuro)
+    doc.line(margin, yPos, pageWidth - margin, yPos)
+
+    yPos += 10
+    doc.setFont("helvetica", "italic")
+    doc.setFontSize(8)
+    doc.text("Este comprobante es válido como constancia de pago.", pageWidth / 2, yPos, { align: "center" })
+    doc.text("Distribuidora de Agua Los Pinos - Sistema de Gestión", pageWidth / 2, yPos + 5, { align: "center" })
+    doc.text(`Generado el ${new Date().toLocaleString()}`, pageWidth / 2, yPos + 10, { align: "center" })
+
+    // Guardar PDF
+    doc.save(`recibo_${datosRecibo.numeroRecibo}.pdf`)
+  }
+
   const handlePagar = async () => {
     if (numeroCargasAPagar <= 0 || numeroCargasAPagar > cargasDeuda.length) {
       Swal.fire({
@@ -356,23 +438,17 @@ export default function UsuarioDetalles() {
       return
     }
 
-    // Obtener las cargas más antiguas según el número seleccionado
     const cargasAPagar = cargasDeuda.slice(0, numeroCargasAPagar)
     const cargaIds = cargasAPagar.map((carga) => carga.id)
-
-    // Calcular el monto total
     const montoCalculado = cargasAPagar.reduce((total, carga) => total + (carga.costo || 30), 0)
 
-    // Determinar el ID de usuario para el pago
     let usuarioIdPago
-
     if (activeTab === "conductores" && conductorSeleccionado) {
       usuarioIdPago = conductorSeleccionado.id
     } else {
       usuarioIdPago = usuarioSeleccionado.id
     }
 
-    // Crear el objeto de datos para la API según su estructura original
     const datosPago = {
       usuarioId: usuarioIdPago,
       monto: montoCalculado,
@@ -392,14 +468,27 @@ export default function UsuarioDetalles() {
 
       if (response.ok) {
         const resultado = await response.json()
-        Swal.fire({
-          icon: "success",
-          title: "¡Éxito!",
-          text: "Pago realizado con éxito",
-        })
-        setShowPaymentDialog(false)
 
-        // Actualizar datos según la pestaña activa
+        // Preparar datos del recibo
+        const datosRecibo = {
+          numeroRecibo: generarNumeroRecibo(resultado.id, usuarioSeleccionado.ci),
+          fechaHora: new Date().toLocaleString(),
+          cliente:
+            activeTab === "conductores" && conductorSeleccionado
+              ? conductorSeleccionado.nombre
+              : usuarioSeleccionado.nombre,
+          tipoCliente: activeTab === "conductores" && conductorSeleccionado ? "Conductor" : usuarioSeleccionado.rol,
+          numeroCargas: numeroCargasAPagar,
+          montoTotal: montoCalculado,
+          cargasDetalle: cargasAPagar,
+          pagoId: resultado.id,
+        }
+
+        setPagoRealizado(datosRecibo)
+        setShowPaymentDialog(false)
+        setShowReceiptDialog(true)
+
+        // Actualizar datos
         if (activeTab === "conductores" && conductorSeleccionado) {
           await fetchCargasUsuario(conductorSeleccionado.id, false)
         } else {
@@ -426,7 +515,6 @@ export default function UsuarioDetalles() {
     }
   }
 
-  // Modificar la función filtrarCargas para que devuelva todas las cargas cuando los filtros no estén activos
   const filtrarCargas = () => {
     if (!filtrosActivos) {
       return cargas
@@ -436,7 +524,7 @@ export default function UsuarioDetalles() {
       const fechaCarga = new Date(carga.fechaHora)
       const inicio = new Date(fechaInicio)
       const fin = new Date(fechaFin)
-      fin.setHours(23, 59, 59, 999) // Ajustar al final del día
+      fin.setHours(23, 59, 59, 999)
 
       const cumpleFecha = fechaCarga >= inicio && fechaCarga <= fin
       const cumpleEstado = filtroEstado ? carga.estado === filtroEstado : true
@@ -447,7 +535,6 @@ export default function UsuarioDetalles() {
 
   const cargasFiltradas = filtrarCargas()
 
-  // Funciones para paginación
   const getPaginatedData = (data, page, itemsPerPage) => {
     const startIndex = (page - 1) * itemsPerPage
     const endIndex = startIndex + itemsPerPage
@@ -458,7 +545,6 @@ export default function UsuarioDetalles() {
     return Math.ceil(totalItems / itemsPerPage)
   }
 
-  // Datos paginados
   const paginatedCargas = getPaginatedData(cargasFiltradas, currentPage, itemsPerPage)
   const totalPages = getTotalPages(cargasFiltradas.length, itemsPerPage)
 
@@ -500,7 +586,6 @@ export default function UsuarioDetalles() {
           </CardHeader>
           <CardContent>
             <div className="flex flex-col md:flex-row gap-6">
-              {/* Columna izquierda: Información del usuario */}
               <div className="md:w-1/2">
                 <div className="flex items-start gap-4">
                   <Avatar className="h-24 w-24">
@@ -522,13 +607,11 @@ export default function UsuarioDetalles() {
                       <h3 className="text-sm font-medium text-gray-500">CI</h3>
                       <p className="text-lg">{usuarioSeleccionado?.ci || "No disponible"}</p>
                     </div>
-
                     <Badge className="mt-1">{usuarioSeleccionado?.rol}</Badge>
                   </div>
                 </div>
               </div>
 
-              {/* Columna derecha: Resumen de cargas */}
               <div className="md:w-1/2">
                 <div className="grid grid-cols-1 gap-4">
                   <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-200">
@@ -555,7 +638,11 @@ export default function UsuarioDetalles() {
                     </div>
                     <Button
                       className="w-full mt-3 bg-gray-900 hover:bg-gray-800 text-white"
-                      onClick={() => setShowPaymentDialog(true)}
+                      onClick={() => {
+                        setNumeroCargasAPagar(Math.min(cargasDeuda.length, 1))
+                        setMontoTotal(cargasDeuda.length > 0 ? cargasDeuda[0].costo || 30 : 0)
+                        setShowPaymentDialog(true)
+                      }}
                       disabled={cargasDeuda.length === 0}
                     >
                       Pagar Deudas
@@ -579,7 +666,6 @@ export default function UsuarioDetalles() {
             </TabsContent>
 
             <TabsContent value="conductores">
-              {/* Selector de conductor y sus cargas */}
               <Card className="mb-6 shadow-md border-2 border-gray-300 rounded-lg">
                 <CardHeader>
                   <CardTitle>Seleccionar Conductor</CardTitle>
@@ -635,7 +721,11 @@ export default function UsuarioDetalles() {
                         </div>
                         <Button
                           className="w-full mt-3 bg-gray-900 hover:bg-gray-800 text-white"
-                          onClick={() => setShowPaymentDialog(true)}
+                          onClick={() => {
+                            setNumeroCargasAPagar(Math.min(cargasDeuda.length, 1))
+                            setMontoTotal(cargasDeuda.length > 0 ? cargasDeuda[0].costo || 30 : 0)
+                            setShowPaymentDialog(true)
+                          }}
                           disabled={cargasDeuda.length === 0}
                         >
                           Pagar Deudas
@@ -668,7 +758,6 @@ export default function UsuarioDetalles() {
                 No hay cargas para mostrar con los filtros seleccionados.
               </div>
             ) : isMobile ? (
-              // Modificar la vista móvil para incluir el botón de pago y mostrar el usuario
               <div className="space-y-4">
                 {paginatedCargas.map((carga) => (
                   <Card
@@ -714,40 +803,10 @@ export default function UsuarioDetalles() {
                       >
                         Ver Detalles
                       </Button>
-                      {carga.estado === "deuda" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            // Configurar para pagar esta carga específica
-                            const usuarioIdPago =
-                              carga.tipoCuenta === "conductor" ? carga.conductorId : usuarioSeleccionado.id
-
-                            // Configurar los estados para el pago
-                            setCargasDeuda([carga])
-                            setNumeroCargasAPagar(1)
-                            setMontoTotal(carga.costo || 30)
-
-                            // Si es un conductor, actualizar temporalmente el conductorSeleccionado
-                            if (carga.tipoCuenta === "conductor" && carga.conductorId) {
-                              const conductor = conductores.find((c) => c.id === carga.conductorId)
-                              if (conductor) {
-                                setConductorSeleccionado(conductor)
-                              }
-                            }
-
-                            setShowPaymentDialog(true)
-                          }}
-                          className="bg-red-600 hover:bg-red-700 text-white border-red-500"
-                        >
-                          Pagar
-                        </Button>
-                      )}
                     </CardFooter>
                   </Card>
                 ))}
 
-                {/* Paginación para vista móvil */}
                 <div className="flex justify-between items-center mt-4">
                   <Button
                     onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
@@ -807,22 +866,6 @@ export default function UsuarioDetalles() {
                             >
                               Ver Detalles
                             </Button>
-                            {carga.estado === "deuda" && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  // Configurar para pagar solo esta carga específica
-                                  setCargasDeuda([carga])
-                                  setNumeroCargasAPagar(1)
-                                  setMontoTotal(carga.costo || 30)
-                                  setShowPaymentDialog(true)
-                                }}
-                                className="bg-red-600 hover:bg-red-700 text-white border-red-500"
-                              >
-                                Pagar
-                              </Button>
-                            )}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -832,7 +875,6 @@ export default function UsuarioDetalles() {
               </div>
             )}
 
-            {/* Paginación para vista de escritorio */}
             {!isMobile && cargasFiltradas.length > 0 && (
               <div className="flex justify-between items-center mt-6">
                 <Button
@@ -860,58 +902,48 @@ export default function UsuarioDetalles() {
         </Card>
       </>
 
-      {/* Diálogo de Pago */}
-
+      {/* Diálogo de Pago Simplificado */}
       <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
-        <DialogContent className="border-2 border-gray-300">
+        <DialogContent className="border-2 border-gray-300 max-w-md">
           <DialogHeader>
-            <DialogTitle>
-              {cargasDeuda.length === 1
-                ? `Pagar Carga #${cargasDeuda[0].id} - ${cargasDeuda[0].usuario?.nombre || "N/A"}`
-                : usuarioSeleccionado?.rol === "propietario" && activeTab === "conductores" && conductorSeleccionado
-                  ? `Realizar Pago - ${conductorSeleccionado.nombre}`
-                  : "Realizar Pago"}
+            <DialogTitle className="flex items-center">
+              <Receipt className="mr-2 h-5 w-5" />
+              Realizar Pago
             </DialogTitle>
             <DialogDescription>
-              {cargasDeuda.length === 1
-                ? "Confirme el pago de esta carga."
-                : "Seleccione el número de cargas a pagar. Se pagarán las cargas más antiguas primero."}
+              Seleccione el número de cargas a pagar. Se pagarán las cargas más antiguas primero.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            {cargasDeuda.length > 1 && (
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="numeroCargasAPagar" className="text-right">
-                  Número de Cargas:
-                </Label>
-                <Input
-                  id="numeroCargasAPagar"
-                  type="number"
-                  min="1"
-                  max={cargasDeuda.length}
-                  value={numeroCargasAPagar}
-                  onChange={handleNumeroCargasChange}
-                  className="col-span-3 border-2 border-gray-300"
-                />
-              </div>
-            )}
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label className="text-right">Monto Total:</Label>
-              <div className="col-span-3 flex items-center">
-                <Input value={`Bs${montoTotal}`} readOnly className="bg-gray-50 border-2 border-gray-300" />
-              </div>
+          <div className="grid gap-6 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="numeroCargasAPagar">Número de Cargas a Pagar:</Label>
+              <Input
+                id="numeroCargasAPagar"
+                type="number"
+                min="1"
+                max={cargasDeuda.length}
+                value={numeroCargasAPagar}
+                onChange={handleNumeroCargasChange}
+                className="border-2 border-gray-300"
+              />
+              <p className="text-sm text-gray-500">Máximo: {cargasDeuda.length} cargas pendientes</p>
             </div>
+
+            <div className="space-y-2">
+              <Label>Monto Total a Pagar:</Label>
+              <div className="text-2xl font-bold text-green-600">Bs {montoTotal.toFixed(2)}</div>
+            </div>
+
             {numeroCargasAPagar > 0 && (
-              <div className="mt-2">
-                <h4 className="font-medium mb-2">Cargas a pagar:</h4>
-                <div className="max-h-40 overflow-y-auto border-2 border-gray-300 rounded-md p-2">
-                  {cargasDeuda.slice(0, numeroCargasAPagar).map((carga) => (
-                    <div key={carga.id} className="flex justify-between py-1 border-b last:border-0">
+              <div className="space-y-2">
+                <Label>Cargas que se pagarán:</Label>
+                <div className="max-h-32 overflow-y-auto border rounded-md p-2 bg-gray-50">
+                  {cargasDeuda.slice(0, numeroCargasAPagar).map((carga, index) => (
+                    <div key={carga.id} className="flex justify-between text-sm py-1">
                       <span>
-                        Carga #{carga.id} - {new Date(carga.fechaHora).toLocaleDateString()} -{" "}
-                        {carga.usuario?.nombre || "N/A"}
+                        #{carga.id} - {new Date(carga.fechaHora).toLocaleDateString()}
                       </span>
-                      <span>Bs{carga.costo || 30}</span>
+                      <span className="font-medium">Bs {carga.costo || 30}</span>
                     </div>
                   ))}
                 </div>
@@ -919,11 +951,115 @@ export default function UsuarioDetalles() {
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPaymentDialog(false)} className="border-2 border-gray-300">
+            <Button variant="outline" onClick={() => setShowPaymentDialog(false)}>
               Cancelar
             </Button>
-            <Button onClick={handlePagar} className="bg-gray-900 hover:bg-gray-800 text-white">
+            <Button onClick={handlePagar} className="bg-green-600 hover:bg-green-700 text-white">
+              <Receipt className="mr-2 h-4 w-4" />
               Confirmar Pago
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo de Recibo */}
+      <Dialog open={showReceiptDialog} onOpenChange={setShowReceiptDialog}>
+        <DialogContent className="border-2 border-gray-300 max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center text-green-600">
+              <Receipt className="mr-2 h-5 w-5" />
+              ¡Pago Realizado con Éxito!
+            </DialogTitle>
+          </DialogHeader>
+          {pagoRealizado && (
+            <div className="space-y-4">
+              {/* Encabezado del recibo */}
+              <div className="text-center border-b pb-4">
+                <h3 className="text-lg font-bold text-blue-900">DISTRIBUIDORA DE AGUA LOS PINOS</h3>
+                <p className="text-sm text-gray-600">Comprobante de Pago</p>
+              </div>
+
+              {/* Información del recibo */}
+              <div className="space-y-3 bg-gray-50 p-4 rounded-lg">
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <span className="font-medium">Número de Recibo:</span>
+                    <p className="text-blue-600 font-mono">{pagoRealizado.numeroRecibo}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium">Fecha y hora:</span>
+                    <p>{pagoRealizado.fechaHora}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium">Cliente:</span>
+                    <p>{pagoRealizado.cliente}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium">Tipo:</span>
+                    <p>{pagoRealizado.tipoCliente}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium">Cargas pagadas:</span>
+                    <p className="font-bold">{pagoRealizado.numeroCargas}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium">Importe total:</span>
+                    <p className="text-green-600 font-bold text-lg">Bs {pagoRealizado.montoTotal.toFixed(2)}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Detalle de cargas */}
+              <div className="space-y-2">
+                <h4 className="font-medium text-sm">Detalle de cargas pagadas:</h4>
+                <div className="max-h-40 overflow-y-auto border rounded p-2 text-xs space-y-2">
+                  {pagoRealizado.cargasDetalle.map((carga, index) => (
+                    <div key={carga.id} className="p-2 bg-gray-50 rounded border-l-2 border-blue-500">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <p className="font-medium">Carga #{carga.id}</p>
+                          <p className="text-gray-600">
+                            {new Date(carga.fechaHora).toLocaleDateString("es-ES", {
+                              weekday: "short",
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                            })}{" "}
+                            -{" "}
+                            {new Date(carga.fechaHora).toLocaleTimeString("es-ES", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </p>
+                          <p className="text-gray-600">
+                            Usuario: {carga.usuario?.nombre || carga.usuario?.username || "N/A"}
+                          </p>
+                        </div>
+                        <span className="font-bold text-green-600">Bs {carga.costo}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Pie del recibo */}
+              <div className="text-center text-xs text-gray-500 border-t pt-2">
+                <p>Este comprobante es válido como constancia de pago</p>
+                <p>Sistema de Gestión - Los Pinos</p>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="flex justify-between">
+            <Button
+              variant="outline"
+              onClick={() => pagoRealizado && generarPDFRecibo(pagoRealizado)}
+              className="flex items-center"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Descargar PDF
+            </Button>
+            <Button onClick={() => setShowReceiptDialog(false)} className="bg-green-600 hover:bg-green-700">
+              Cerrar
             </Button>
           </DialogFooter>
         </DialogContent>

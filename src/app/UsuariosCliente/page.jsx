@@ -2,7 +2,19 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { ChevronLeft, ChevronRight, Eye, FileText, CreditCard, Filter } from "lucide-react"
+import {
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  FileText,
+  CreditCard,
+  Filter,
+  User,
+  Mail,
+  BadgeIcon as IdCard,
+  Calendar,
+  Shield,
+} from "lucide-react"
 
 import { Button } from "@/components/components/ui/button"
 import { Input } from "@/components/components/ui/input"
@@ -12,87 +24,214 @@ import { Checkbox } from "@/components/components/ui/checkbox"
 import { Toaster } from "@/components/components/ui/toaster"
 import { toast } from "@/components/hooks/use-toast"
 import { Badge } from "@/components/components/ui/badge"
-import RFIDCardManager from "@/components/rfid-card-manager"
-import UserBlockManager from "@/components/user-block-manager"
+import { Label } from "@/components/components/ui/label"
 
+// Importar componentes PWA
+import OfflineIndicator from "@/components/pwa-features/offline-indicator"
+import SyncManager from "@/components/pwa-features/sync-manager"
+import NetworkStatusHandler from "@/components/pwa-features/network-status-handler"
+import InstallPrompt from "@/components/pwa-features/install-prompt"
+import CacheIndicator from "@/components/pwa-features/cache-indicator"
+import ResponsiveContainer from "@/components/responsive-container"
+import { usePWAFeatures } from "../../hooks/use-pwa-features"
+import { saveToIndexedDB, getFromIndexedDB, registerSyncRequest } from "../../utils/pwa-helpers"
+import BackgroundSync from "@/components/pwa-features/background-sync"
 
-export default function ClientManagement() {
-  const [allUsers, setAllUsers] = useState([]) // Todos los usuarios sin filtrar
-  const [filteredUsers, setFilteredUsers] = useState([]) // Usuarios filtrados por rol y búsqueda
+// Componente simulado para RFID Card Manager
+//save@/components/utils/pwa-helpers
+function RFIDCardManager({ userId, userName, currentCardNumber, onSave, isOnline }) {
+  const [showDialog, setShowDialog] = useState(false)
+  const [cardNumber, setCardNumber] = useState(currentCardNumber || "")
+  const [isLoading, setIsLoading] = useState(false)
+
+  const handleSave = async () => {
+    setIsLoading(true)
+    try {
+      await onSave(cardNumber)
+      setShowDialog(false)
+      toast({
+        title: "Éxito",
+        description: "Tarjeta RFID actualizada correctamente",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error.message || "Error al actualizar la tarjeta RFID",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    <>
+      <Button
+        size="sm"
+        variant="outline"
+        className="text-purple-600 hover:text-purple-800 hover:bg-purple-50 border-purple-300 h-8 w-full text-xs font-medium transition-colors duration-200 flex items-center justify-center"
+        onClick={() => setShowDialog(true)}
+      >
+        <CreditCard className="h-3 w-3 mr-1" />
+        RFID
+      </Button>
+
+      <Dialog open={showDialog} onOpenChange={setShowDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Gestionar Tarjeta RFID</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="cardNumber">Número de Tarjeta RFID</Label>
+              <Input
+                id="cardNumber"
+                value={cardNumber}
+                onChange={(e) => setCardNumber(e.target.value)}
+                placeholder="Ingrese el número de la tarjeta"
+              />
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={() => setShowDialog(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSave} disabled={isLoading || !isOnline}>
+                {isLoading ? "Guardando..." : "Guardar"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
+// Componente simulado para User Block Manager
+function UserBlockManager({ userId, userName, isBlocked, blockReason, blockDate, onBlockStatusChange, isOnline }) {
+  const [showDialog, setShowDialog] = useState(false)
+  const [reason, setReason] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+
+  const handleBlock = async () => {
+    if (!reason.trim()) {
+      toast({
+        title: "Error",
+        description: "Debe proporcionar un motivo para el bloqueo",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      await onBlockStatusChange(true, reason)
+      setShowDialog(false)
+      setReason("")
+      toast({
+        title: "Usuario bloqueado",
+        description: "El usuario ha sido bloqueado correctamente",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error.message || "Error al bloquear el usuario",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleUnblock = async () => {
+    setIsLoading(true)
+    try {
+      await onBlockStatusChange(false)
+      toast({
+        title: "Usuario desbloqueado",
+        description: "El usuario ha sido desbloqueado correctamente",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error.message || "Error al desbloquear el usuario",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    <>
+      <Button
+        size="sm"
+        variant="outline"
+        className={`${
+          isBlocked
+            ? "text-green-600 hover:text-green-800 hover:bg-green-50 border-green-300"
+            : "text-red-600 hover:text-red-800 hover:bg-red-50 border-red-300"
+        } h-8 w-full text-xs font-medium transition-colors duration-200 flex items-center justify-center`}
+        onClick={() => {
+          if (isBlocked) {
+            handleUnblock()
+          } else {
+            setShowDialog(true)
+          }
+        }}
+        disabled={isLoading || !isOnline}
+      >
+        <Shield className="h-3 w-3 mr-1" />
+        {isBlocked ? "Desbloquear" : "Bloquear"}
+      </Button>
+
+      <Dialog open={showDialog} onOpenChange={setShowDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Bloquear Usuario</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="blockReason">Motivo del bloqueo</Label>
+              <Input
+                id="blockReason"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Ingrese el motivo del bloqueo"
+              />
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={() => setShowDialog(false)}>
+                Cancelar
+              </Button>
+              <Button variant="destructive" onClick={handleBlock} disabled={isLoading}>
+                {isLoading ? "Bloqueando..." : "Bloquear"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
+export default function ClientManagementEnhanced() {
+  const [allUsers, setAllUsers] = useState([])
+  const [filteredUsers, setFilteredUsers] = useState([])
   const [currentPage, setCurrentPage] = useState(1)
-  const [usersPerPage] = useState(6)
+  const [usersPerPage] = useState(8)
   const [showDetailsDialog, setShowDetailsDialog] = useState(false)
   const [selectedUser, setSelectedUser] = useState(null)
   const [searchQuery, setSearchQuery] = useState("")
-  const [isOnline, setIsOnline] = useState(true)
   const [showFilterMenu, setShowFilterMenu] = useState(false)
-  const [selectedRoles, setSelectedRoles] = useState(["propietario", "conductor"]) // Por defecto, ambos roles seleccionados
-  const [pendingRequests, setPendingRequests] = useState(0)
+  const [selectedRoles, setSelectedRoles] = useState(["propietario", "conductor"])
 
   const router = useRouter()
+  const { isOnline, updatePendingSyncCount } = usePWAFeatures()
 
-  // Detectar estado de conexión
-  useEffect(() => {
-    setIsOnline(navigator.onLine)
-
-    const handleOnline = () => {
-      setIsOnline(true)
-      toast({
-        title: "Conexión restaurada",
-        description: "Las solicitudes pendientes se sincronizarán automáticamente.",
-      })
-    }
-
-    const handleOffline = () => {
-      setIsOnline(false)
-      toast({
-        title: "Sin conexión",
-        description: "Puedes seguir trabajando. Los cambios se sincronizarán cuando vuelva la conexión.",
-        variant: "destructive",
-      })
-    }
-
-    window.addEventListener("online", handleOnline)
-    window.addEventListener("offline", handleOffline)
-
-    // Verificar si hay solicitudes pendientes
-    if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
-      checkPendingRequests()
-    }
-
-    return () => {
-      window.removeEventListener("online", handleOnline)
-      window.removeEventListener("offline", handleOffline)
-    }
-  }, [])
-
-  // Función para verificar solicitudes pendientes (simplificada)
-  const checkPendingRequests = async () => {
-    try {
-      const localData = localStorage.getItem("pendingRequestsCount")
-      if (localData) {
-        setPendingRequests(Number.parseInt(localData, 10))
-      }
-    } catch (error) {
-      console.error("Error al verificar solicitudes pendientes:", error)
-    }
-  }
-
-  // Función para actualizar el contador de solicitudes pendientes
-  const updatePendingRequestsCount = (increment = true) => {
-    setPendingRequests((prev) => {
-      const newCount = increment ? prev + 1 : Math.max(0, prev - 1)
-      localStorage.setItem("pendingRequestsCount", newCount.toString())
-      return newCount
-    })
-  }
-
-  // Cargar datos iniciales
   useEffect(() => {
     fetchData()
   }, [])
 
-  // Aplicar filtros cuando cambian los criterios
   useEffect(() => {
     applyFilters()
   }, [allUsers, selectedRoles, searchQuery])
@@ -106,33 +245,50 @@ export default function ClientManagement() {
       if (response.ok) {
         let jsonData = await response.json()
 
-        // Filtrar solo propietarios y conductores para el conjunto completo
         jsonData = jsonData.filter((user) => user.rol === "propietario" || user.rol === "conductor")
 
-        // Ordenar por rol
         jsonData.sort((a, b) => {
           const rolesOrden = { propietario: 1, conductor: 2 }
           return rolesOrden[a.rol] - rolesOrden[b.rol]
         })
 
-        // Guardar en localStorage para acceso offline
+        // Guardar en caché local y IndexedDB
         localStorage.setItem("cachedUsers", JSON.stringify(jsonData))
-
-        // Guardar todos los usuarios (solo propietarios y conductores)
+        await saveToIndexedDB("clients", { id: "all", data: jsonData, timestamp: Date.now() })
         setAllUsers(jsonData)
+        localStorage.setItem("usingCachedData", "false")
       } else if (response.status === 401) {
         router.push("/")
       }
     } catch (error) {
       console.error("Error al obtener usuarios:", error)
 
-      // En caso de error (probablemente offline), usar datos en caché
+      // Intentar cargar desde IndexedDB primero
+      try {
+        const cachedData = await getFromIndexedDB("clients", "all")
+        if (cachedData && cachedData.data) {
+          let jsonData = cachedData.data
+          jsonData = jsonData.filter((user) => user.rol === "propietario" || user.rol === "conductor")
+          setAllUsers(jsonData)
+          localStorage.setItem("usingCachedData", "true")
+
+          toast({
+            title: "Usando datos en caché",
+            description: "Estás viendo datos almacenados localmente.",
+          })
+          return
+        }
+      } catch (indexedDBError) {
+        console.error("Error al cargar desde IndexedDB:", indexedDBError)
+      }
+
+      // Fallback a localStorage
       const cachedData = localStorage.getItem("cachedUsers")
       if (cachedData) {
         let jsonData = JSON.parse(cachedData)
-        // Asegurar que solo se muestren propietarios y conductores incluso desde caché
         jsonData = jsonData.filter((user) => user.rol === "propietario" || user.rol === "conductor")
         setAllUsers(jsonData)
+        localStorage.setItem("usingCachedData", "true")
 
         if (!navigator.onLine) {
           toast({
@@ -144,7 +300,6 @@ export default function ClientManagement() {
     }
   }
 
-  // Función para obtener los datos completos de un usuario específico
   const fetchUserById = async (userId) => {
     try {
       const response = await fetch(`https://mi-backendsecond.onrender.com/usuarios/${userId}`, {
@@ -159,7 +314,6 @@ export default function ClientManagement() {
       }
     } catch (error) {
       console.error("Error al obtener usuario por ID:", error)
-      // Si falla la petición, buscar en los datos locales
       const user = allUsers.find((u) => u.id === userId)
       if (user) {
         return user
@@ -168,16 +322,13 @@ export default function ClientManagement() {
     }
   }
 
-  // Aplicar filtros de rol y búsqueda
   const applyFilters = () => {
     let filtered = [...allUsers]
 
-    // Filtrar por roles seleccionados
     if (selectedRoles.length > 0) {
       filtered = filtered.filter((user) => selectedRoles.includes(user.rol))
     }
 
-    // Filtrar por búsqueda
     if (searchQuery) {
       filtered = filtered.filter(
         (user) =>
@@ -188,66 +339,68 @@ export default function ClientManagement() {
     }
 
     setFilteredUsers(filtered)
-    setCurrentPage(1) // Resetear a la primera página cuando cambian los filtros
-    setShowFilterMenu(false) // Cerrar menú de filtros si está abierto
+    setCurrentPage(1)
+    setShowFilterMenu(false)
   }
 
   const handleRoleFilterChange = (role) => {
     setSelectedRoles((prev) => (prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]))
   }
 
-  const handleViewDetails = (user) => {
-    setSelectedUser(user)
+  const handleViewDetails = async (user) => {
+    try {
+      // Intentar obtener datos actualizados del usuario
+      const updatedUser = await fetchUserById(user.id)
+      setSelectedUser(updatedUser)
+    } catch (error) {
+      // Si falla, usar los datos locales
+      setSelectedUser(user)
+    }
     setShowDetailsDialog(true)
   }
 
   const handleConsultas = (user) => {
-    // Guardar el ID del usuario seleccionado en localStorage
     localStorage.setItem("selectedUserId", user.id.toString())
     router.push("/Consultas")
   }
 
   const handlePagos = (user) => {
-    // Guardar el ID del usuario seleccionado en localStorage
     localStorage.setItem("selectedUserId", user.id.toString())
     router.push("/PagosUsuario")
   }
 
-  // Función para manejar la actualización de la tarjeta RFID
   const handleUpdateRFIDCard = async (userId, cardNumber) => {
     try {
-      // Si estamos offline, actualizar la UI optimistamente
       if (!navigator.onLine) {
-        updatePendingRequestsCount(true)
+        // Registrar para sincronización en segundo plano
+        await registerSyncRequest(`https://mi-backendsecond.onrender.com/usuarios/${userId}`, "PUT", {
+          numeroTarjetaRFID: cardNumber,
+        })
+        updatePendingSyncCount(true)
 
-        // Actualizar usuario en la UI
         setAllUsers((prevUsers) =>
           prevUsers.map((user) =>
             user.id === userId ? { ...user, numeroTarjetaRFID: cardNumber, _isPending: true } : user,
           ),
         )
 
-        return Promise.resolve() // Resolver la promesa para la UI
+        return Promise.resolve()
       }
 
-      // Obtener los datos completos del usuario
       const userData = await fetchUserById(userId)
 
-      // Preparar los datos completos con solo el RFID modificado
       const updatedUserData = {
         nombre: userData.nombre,
         correo: userData.correo,
         ci: userData.ci,
         username: userData.username,
-        // No enviamos password para mantener la actual
         rol: userData.rol,
-        numeroTarjetaRFID: cardNumber, // Solo este campo cambia
+        numeroTarjetaRFID: cardNumber,
         propietarioId: userData.propietarioId,
         bloqueado: userData.bloqueado,
         motivoBloqueo: userData.motivoBloqueo,
       }
 
-      // Enviar la actualización con todos los campos
       const response = await fetch(`https://mi-backendsecond.onrender.com/usuarios/${userId}`, {
         method: "PUT",
         headers: {
@@ -258,12 +411,10 @@ export default function ClientManagement() {
       })
 
       if (response.ok) {
-        // Actualizar los datos locales inmediatamente
         setAllUsers((prevUsers) =>
           prevUsers.map((user) => (user.id === userId ? { ...user, numeroTarjetaRFID: cardNumber } : user)),
         )
 
-        // También recargar desde el servidor para asegurar sincronización
         fetchData()
         return Promise.resolve()
       } else {
@@ -277,14 +428,17 @@ export default function ClientManagement() {
     }
   }
 
-  // Función para manejar el bloqueo/desbloqueo de usuarios
   const handleBlockStatusChange = async (userId, blocked, reason = "") => {
     try {
-      // Si estamos offline, actualizar la UI optimistamente
       if (!navigator.onLine) {
-        updatePendingRequestsCount(true)
+        // Registrar para sincronización en segundo plano
+        const url = blocked
+          ? `https://mi-backendsecond.onrender.com/usuarios/${userId}/bloquear`
+          : `https://mi-backendsecond.onrender.com/usuarios/${userId}/desbloquear`
 
-        // Actualizar usuario en la UI
+        await registerSyncRequest(url, "POST", blocked ? { motivoBloqueo: reason } : {})
+        updatePendingSyncCount(true)
+
         setAllUsers((prevUsers) =>
           prevUsers.map((user) =>
             user.id === userId
@@ -299,7 +453,7 @@ export default function ClientManagement() {
           ),
         )
 
-        return Promise.resolve() // Resolver la promesa para la UI
+        return Promise.resolve()
       }
 
       const url = blocked
@@ -316,7 +470,7 @@ export default function ClientManagement() {
       })
 
       if (response.ok) {
-        fetchData() // Actualizar datos desde el servidor
+        fetchData()
         return Promise.resolve()
       } else {
         const errorData = await response.json().catch(() => ({}))
@@ -328,218 +482,401 @@ export default function ClientManagement() {
     }
   }
 
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A"
+    try {
+      return new Date(dateString).toLocaleDateString("es-ES", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    } catch {
+      return dateString
+    }
+  }
+
   const indexOfLastUser = currentPage * usersPerPage
   const indexOfFirstUser = indexOfLastUser - usersPerPage
   const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser)
   const totalPages = Math.ceil(filteredUsers.length / usersPerPage)
 
-  // Estilos para el encabezado de la tabla
-  const tableHeaderStyle = "bg-blue-900"
-  const tableHeaderCellStyle = "border-r border-blue-800 last:border-r-0"
-
   return (
-    <div className="container mx-auto px-4 pt-20 pb-8">
-      <Toaster />
-      <h1 className="text-3xl font-bold mb-8 text-center">Gestión de Clientes</h1>
+    <NetworkStatusHandler onOffline={() => console.log("Modo offline activado")} onOnline={() => fetchData()}>
+      <ResponsiveContainer className="max-w-6xl mx-auto pt-16">
+        <Toaster />
 
-      {pendingRequests > 0 && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4">
-          <p className="text-yellow-800 font-medium">
-            Tienes {pendingRequests} {pendingRequests === 1 ? "solicitud" : "solicitudes"} pendiente
-            {pendingRequests === 1 ? "" : "s"} de sincronización
-          </p>
-          <p className="text-yellow-600 text-sm">
-            Los cambios se sincronizarán automáticamente cuando se restaure la conexión
-          </p>
+        <div className="flex flex-col items-center mb-4">
+          <h1 className="text-2xl font-bold text-gray-800 mb-4">Gestión de Clientes</h1>
+          <div className="flex justify-end items-center w-full">
+            <OfflineIndicator />
+          </div>
         </div>
-      )}
 
-      <div className="flex justify-end items-center mb-6">
-        <div className="flex space-x-2">
+        <InstallPrompt />
+        <SyncManager onSync={fetchData} />
+        <CacheIndicator />
+        <BackgroundSync syncTag="client-sync" onSyncRegistered={() => console.log("Sync registrado para clientes")} />
+
+        <div className="flex flex-col sm:flex-row justify-end items-start sm:items-center mb-4 gap-2">
           <Input
             type="text"
             placeholder="Buscar cliente..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="max-w-sm"
+            className="text-sm w-full sm:max-w-xs"
           />
-          <Button onClick={() => setShowFilterMenu(!showFilterMenu)}>
-            <Filter className="mr-2 h-4 w-4" /> Filtros
+          <Button size="sm" onClick={() => setShowFilterMenu(!showFilterMenu)} className="w-full sm:w-auto">
+            <Filter className="mr-1 h-3 w-3" /> Filtros
           </Button>
         </div>
-      </div>
 
-      {showFilterMenu && (
-        <div className="bg-white p-4 rounded-lg shadow-md mb-6 border border-gray-200">
-          <h2 className="font-semibold mb-2">Filtrar por Rol</h2>
-          <div className="space-y-2">
-            {["propietario", "conductor"].map((rol) => (
-              <div key={rol} className="flex items-center">
-                <Checkbox
-                  id={rol}
-                  checked={selectedRoles.includes(rol)}
-                  onCheckedChange={() => handleRoleFilterChange(rol)}
-                />
-                <label
-                  htmlFor={rol}
-                  className="ml-2 text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  {rol.charAt(0).toUpperCase() + rol.slice(1)}
-                </label>
-              </div>
-            ))}
-          </div>
-          <div className="mt-4 space-x-2">
-            <Button onClick={applyFilters}>Aplicar Filtros</Button>
-            <Button variant="outline" onClick={() => setShowFilterMenu(false)}>
-              Cancelar
-            </Button>
-          </div>
-        </div>
-      )}
-
-      <div className="rounded-lg overflow-hidden shadow-lg border border-gray-300">
-        <Table>
-          <TableHeader className={tableHeaderStyle}>
-            <TableRow>
-              <TableHead className={`text-white font-bold ${tableHeaderCellStyle}`}>Nombre</TableHead>
-              <TableHead className={`text-white font-bold ${tableHeaderCellStyle}`}>Username</TableHead>
-              <TableHead className={`text-white font-bold ${tableHeaderCellStyle}`}>Rol</TableHead>
-              <TableHead className={`text-white font-bold ${tableHeaderCellStyle}`}>Estado</TableHead>
-              <TableHead className="text-white font-bold">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {currentUsers.length > 0 ? (
-              currentUsers.map((user) => (
-                <TableRow
-                  key={user.id}
-                  className={`${
-                    user._isPending
-                      ? "bg-yellow-50"
-                      : user.bloqueado
-                        ? "bg-red-50"
-                        : currentUsers.indexOf(user) % 2 === 0
-                          ? "bg-white"
-                          : "bg-gray-100"
-                  } hover:bg-gray-50 transition-colors duration-150`}
-                >
-                  <TableCell className="border-b border-gray-200">
-                    {user.nombre}
-                    {user._isPending && (
-                      <Badge variant="outline" className="ml-2 bg-yellow-100 text-yellow-800 border-yellow-300">
-                        Pendiente
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="border-b border-gray-200">{user.username}</TableCell>
-                  <TableCell className="border-b border-gray-200">{user.rol}</TableCell>
-                  <TableCell className="border-b border-gray-200">
-                    {user.bloqueado ? (
-                      <Badge variant="outline" className="bg-red-100 text-red-800 border-red-300">
-                        Bloqueado
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">
-                        Activo
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="border-b border-gray-200">
-                    <div className="flex space-x-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 border-blue-300 font-medium"
-                        onClick={() => handleViewDetails(user)}
-                      >
-                        <Eye className="h-4 w-4 mr-1" />
-                        Ver
-                      </Button>
-
-                      <RFIDCardManager
-                        userId={user.id}
-                        userName={user.nombre}
-                        currentCardNumber={user.numeroTarjetaRFID}
-                        onSave={(cardNumber) => handleUpdateRFIDCard(user.id, cardNumber)}
-                        isOnline={isOnline}
-                      />
-
-                      <UserBlockManager
-                        userId={user.id}
-                        userName={user.nombre}
-                        isBlocked={user.bloqueado}
-                        blockReason={user.motivoBloqueo}
-                        blockDate={user.fechaBloqueo}
-                        onBlockStatusChange={(blocked, reason) => handleBlockStatusChange(user.id, blocked, reason)}
-                        isOnline={isOnline}
-                      />
-
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-green-600 hover:text-green-800 hover:bg-green-50 border-green-300 font-medium"
-                        onClick={() => handleConsultas(user)}
-                      >
-                        <FileText className="h-4 w-4 mr-1" />
-                        Consultas
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-amber-600 hover:text-amber-800 hover:bg-amber-50 border-amber-300 font-medium"
-                        onClick={() => handlePagos(user)}
-                      >
-                        <CreditCard className="h-4 w-4 mr-1" />
-                        Pago
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center py-4 border-b border-gray-200">
-                  No se encontraron clientes con los filtros seleccionados
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      <div className="flex justify-between items-center mt-6">
-        <Button onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))} disabled={currentPage === 1}>
-          <ChevronLeft className="mr-2 h-4 w-4" /> Anterior
-        </Button>
-        <span>
-          Página {currentPage} de {totalPages || 1}
-        </span>
-        <Button
-          onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-          disabled={currentPage === totalPages || totalPages === 0}
-        >
-          Siguiente <ChevronRight className="ml-2 h-4 w-4" />
-        </Button>
-      </div>
-
-      <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
-        <DialogContent aria-describedby="details-dialog-description">
-          <DialogHeader>
-            <DialogTitle className="text-blue-700">Detalles del Cliente</DialogTitle>
-          </DialogHeader>
-          {selectedUser && (
-            <div className="grid gap-4 py-4" id="details-dialog-description">
-              {Object.entries(selectedUser).map(([key, value]) => (
-                <div key={key} className="grid grid-cols-4 items-center gap-4">
-                  <span className="font-medium text-right">{key.charAt(0).toUpperCase() + key.slice(1)}:</span>
-                  <span className="col-span-3">{key === "bloqueado" ? (value ? "Sí" : "No") : value || "N/A"}</span>
+        {showFilterMenu && (
+          <div className="bg-white p-3 rounded-lg shadow-md mb-4 border text-sm">
+            <h2 className="font-semibold mb-2">Filtrar por Rol</h2>
+            <div className="space-y-1">
+              {["propietario", "conductor"].map((rol) => (
+                <div key={rol} className="flex items-center">
+                  <Checkbox
+                    id={rol}
+                    checked={selectedRoles.includes(rol)}
+                    onCheckedChange={() => handleRoleFilterChange(rol)}
+                  />
+                  <label htmlFor={rol} className="ml-2 text-sm">
+                    {rol.charAt(0).toUpperCase() + rol.slice(1)}
+                  </label>
                 </div>
               ))}
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
-    </div>
+            <div className="mt-3 space-x-2">
+              <Button size="sm" onClick={applyFilters}>
+                Aplicar
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setShowFilterMenu(false)}>
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        )}
+
+        <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader className="bg-gradient-to-r from-indigo-700 to-indigo-600">
+                <TableRow>
+                  <TableHead className="text-white font-semibold text-sm py-3 px-4 border-r-2 border-indigo-500 last:border-r-0">
+                    Nombre
+                  </TableHead>
+                  <TableHead className="text-white font-semibold text-sm py-3 px-4 border-r-2 border-indigo-500 last:border-r-0">
+                    Username
+                  </TableHead>
+                  <TableHead className="text-white font-semibold text-sm py-3 px-4 border-r-2 border-indigo-500 last:border-r-0 hidden sm:table-cell">
+                    Rol
+                  </TableHead>
+                  <TableHead className="text-white font-semibold text-sm py-3 px-4 border-r-2 border-indigo-500 last:border-r-0 hidden sm:table-cell">
+                    Estado
+                  </TableHead>
+                  <TableHead className="text-white font-semibold text-sm py-3 px-4">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {currentUsers.length > 0 ? (
+                  currentUsers.map((user, index) => (
+                    <TableRow
+                      key={user.id}
+                      className={`${
+                        user._isPending
+                          ? "bg-yellow-50 border-l-4 border-yellow-400"
+                          : user.bloqueado
+                            ? "bg-red-50 border-l-4 border-red-400"
+                            : index % 2 === 0
+                              ? "bg-white"
+                              : "bg-gray-50"
+                      } hover:bg-indigo-50 transition-all duration-200 border-b border-gray-100 last:border-b-0`}
+                    >
+                      <TableCell className="py-3 px-4 font-medium text-gray-900 border-r border-gray-200 last:border-r-0">
+                        <div className="max-w-[120px] truncate">{user.nombre}</div>
+                        {user._isPending && (
+                          <Badge
+                            variant="outline"
+                            className="ml-1 bg-yellow-100 text-yellow-700 border-yellow-300 text-xs font-medium"
+                          >
+                            Pendiente
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="py-3 px-4 text-gray-700 border-r border-gray-200 last:border-r-0">
+                        <div className="max-w-[100px] truncate font-mono text-sm">{user.username}</div>
+                      </TableCell>
+                      <TableCell className="py-3 px-4 border-r border-gray-200 last:border-r-0 hidden sm:table-cell">
+                        <span
+                          className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
+                            user.rol === "propietario"
+                              ? "bg-indigo-100 text-indigo-800"
+                              : "bg-orange-100 text-orange-800"
+                          }`}
+                        >
+                          {user.rol}
+                        </span>
+                      </TableCell>
+                      <TableCell className="py-3 px-4 border-r border-gray-200 last:border-r-0 hidden sm:table-cell">
+                        {user.bloqueado ? (
+                          <Badge
+                            variant="outline"
+                            className="bg-red-100 text-red-700 border-red-300 text-xs font-medium"
+                          >
+                            Bloqueado
+                          </Badge>
+                        ) : (
+                          <Badge
+                            variant="outline"
+                            className="bg-green-100 text-green-700 border-green-300 text-xs font-medium"
+                          >
+                            Activo
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="py-3 px-4">
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 border-indigo-300 h-8 w-full text-xs font-medium transition-colors duration-200 flex items-center justify-center col-span-2 sm:col-span-1"
+                            onClick={() => handleViewDetails(user)}
+                          >
+                            <Eye className="h-3 w-3 mr-1" />
+                            Ver
+                          </Button>
+
+                          <div className="h-8 w-full">
+                            <RFIDCardManager
+                              userId={user.id}
+                              userName={user.nombre}
+                              currentCardNumber={user.numeroTarjetaRFID}
+                              onSave={(cardNumber) => handleUpdateRFIDCard(user.id, cardNumber)}
+                              isOnline={isOnline}
+                            />
+                          </div>
+
+                          <div className="h-8 w-full">
+                            <UserBlockManager
+                              userId={user.id}
+                              userName={user.nombre}
+                              isBlocked={user.bloqueado}
+                              blockReason={user.motivoBloqueo}
+                              blockDate={user.fechaBloqueo}
+                              onBlockStatusChange={(blocked, reason) =>
+                                handleBlockStatusChange(user.id, blocked, reason)
+                              }
+                              isOnline={isOnline}
+                            />
+                          </div>
+
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-green-600 hover:text-green-800 hover:bg-green-50 border-green-300 h-8 w-full text-xs font-medium transition-colors duration-200 flex items-center justify-center"
+                            onClick={() => handleConsultas(user)}
+                          >
+                            <FileText className="h-3 w-3 mr-1" />
+                            Consultas
+                          </Button>
+
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-amber-600 hover:text-amber-800 hover:bg-amber-50 border-amber-300 h-8 w-full text-xs font-medium transition-colors duration-200 flex items-center justify-center"
+                            onClick={() => handlePagos(user)}
+                          >
+                            <CreditCard className="h-3 w-3 mr-1" />
+                            Pago
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8 text-gray-500 font-medium">
+                      No se encontraron clientes con los filtros seleccionados
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row justify-between items-center mt-4 gap-2">
+          <Button
+            size="sm"
+            onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+            disabled={currentPage === 1}
+            className="bg-indigo-600 hover:bg-indigo-700 w-full sm:w-auto"
+          >
+            <ChevronLeft className="mr-1 h-3 w-3" /> Anterior
+          </Button>
+          <span className="text-sm">
+            Página {currentPage} de {totalPages || 1}
+          </span>
+          <Button
+            size="sm"
+            onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+            disabled={currentPage === totalPages || totalPages === 0}
+            className="bg-indigo-600 hover:bg-indigo-700 w-full sm:w-auto"
+          >
+            Siguiente <ChevronRight className="ml-1 h-3 w-3" />
+          </Button>
+        </div>
+
+        <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
+          <DialogContent className="max-w-2xl" aria-describedby="details-dialog-description">
+            <DialogHeader>
+              <DialogTitle className="text-indigo-700 text-xl flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Detalles del Cliente
+              </DialogTitle>
+            </DialogHeader>
+            {selectedUser && (
+              <div className="space-y-6 py-4" id="details-dialog-description">
+                {/* Información Personal */}
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    Información Personal
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-gray-600">Nombre:</span>
+                        <span className="text-gray-900">{selectedUser.nombre || "N/A"}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-gray-600">CI:</span>
+                        <span className="text-gray-900 font-mono">{selectedUser.ci || "N/A"}</span>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Mail className="h-4 w-4 text-gray-500" />
+                        <span className="font-medium text-gray-600">Correo:</span>
+                        <span className="text-gray-900">{selectedUser.correo || "N/A"}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-gray-600">Username:</span>
+                        <span className="text-gray-900 font-mono">{selectedUser.username || "N/A"}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Información del Sistema */}
+                <div className="bg-indigo-50 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                    <IdCard className="h-4 w-4" />
+                    Información del Sistema
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-gray-600">ID:</span>
+                        <span className="text-gray-900 font-mono">{selectedUser.id || "N/A"}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-gray-600">Rol:</span>
+                        <Badge
+                          className={`${
+                            selectedUser.rol === "propietario"
+                              ? "bg-indigo-100 text-indigo-800"
+                              : "bg-orange-100 text-orange-800"
+                          }`}
+                        >
+                          {selectedUser.rol || "N/A"}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-gray-600">Tarjeta RFID:</span>
+                        <span className="text-gray-900 font-mono">
+                          {selectedUser.numeroTarjetaRFID || "Sin asignar"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-gray-600">Propietario ID:</span>
+                        <span className="text-gray-900 font-mono">{selectedUser.propietarioId || "N/A"}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Estado y Bloqueo */}
+                <div className="bg-red-50 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                    <Shield className="h-4 w-4" />
+                    Estado y Seguridad
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-gray-600">Estado:</span>
+                      <Badge
+                        variant="outline"
+                        className={`${
+                          selectedUser.bloqueado
+                            ? "bg-red-100 text-red-700 border-red-300"
+                            : "bg-green-100 text-green-700 border-green-300"
+                        }`}
+                      >
+                        {selectedUser.bloqueado ? "Bloqueado" : "Activo"}
+                      </Badge>
+                    </div>
+                    {selectedUser.bloqueado && (
+                      <>
+                        <div className="flex items-start gap-2">
+                          <span className="font-medium text-gray-600">Motivo del bloqueo:</span>
+                          <span className="text-red-700 bg-red-100 px-2 py-1 rounded text-sm">
+                            {selectedUser.motivoBloqueo || "No especificado"}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-gray-500" />
+                          <span className="font-medium text-gray-600">Fecha de bloqueo:</span>
+                          <span className="text-gray-900">{formatDate(selectedUser.fechaBloqueo)}</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Fechas del Sistema */}
+                {(selectedUser.createdAt || selectedUser.updatedAt) && (
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      Fechas del Sistema
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {selectedUser.createdAt && (
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-gray-600">Creado:</span>
+                          <span className="text-gray-900 text-sm">{formatDate(selectedUser.createdAt)}</span>
+                        </div>
+                      )}
+                      {selectedUser.updatedAt && (
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-gray-600">Actualizado:</span>
+                          <span className="text-gray-900 text-sm">{formatDate(selectedUser.updatedAt)}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+      </ResponsiveContainer>
+    </NetworkStatusHandler>
   )
 }

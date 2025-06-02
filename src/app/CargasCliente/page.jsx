@@ -2,7 +2,21 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { ChevronLeft, ChevronRight, Eye, Filter, CreditCard, Droplet } from "lucide-react"
+import {
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  Filter,
+  CreditCard,
+  Droplet,
+  X,
+  User,
+  Calendar,
+  FileText,
+  Download,
+} from "lucide-react"
+import { jsPDF } from "jspdf"
+import Swal from "sweetalert2"
 
 import { Button } from "../../components/components/ui/button"
 import { Input } from "../../components/components/ui/input"
@@ -13,6 +27,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "../../components/compo
 import { Badge } from "../../components/components/ui/badge"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
+import { Label } from "../../components/components/ui/label"
+import { Separator } from "../../components/components/ui/separator"
 
 const ITEMS_PER_PAGE = 6
 
@@ -169,6 +185,236 @@ export default function WaterChargesClient() {
     setShowDetailsDialog(true)
   }
 
+  // Función para generar PDF de todas las cargas filtradas
+  const handleDownloadAllChargesPDF = async () => {
+    try {
+      if (filteredData.length === 0) {
+        Swal.fire({
+          icon: "warning",
+          title: "Sin datos",
+          text: "No hay cargas para exportar con los filtros seleccionados.",
+        })
+        return
+      }
+
+      const userName = localStorage.getItem("userName") || "Usuario"
+      const userRole = localStorage.getItem("rol") || "Cliente"
+
+      const generateChargesPDF = () => {
+        // Create a half-letter sized PDF (5.5" x 8.5")
+        const doc = new jsPDF({
+          format: [139.7, 215.9], // Half letter size in mm
+          orientation: "portrait",
+        })
+
+        const pageWidth = doc.internal.pageSize.getWidth()
+        const margin = 8
+
+        // Colores
+        const azulOscuro = [0, 51, 102]
+        const grisClaro = [240, 240, 240]
+        const negro = [0, 0, 0]
+
+        // Encabezado con logo y título
+        doc.setFillColor(...grisClaro)
+        doc.rect(0, 0, pageWidth, 22, "F")
+
+        // Logo/Título de la empresa
+        doc.setFontSize(10)
+        doc.setTextColor(...azulOscuro)
+        doc.setFont("helvetica", "bold")
+        doc.text("DISTRIBUIDORA DE AGUA", pageWidth / 2, 7, { align: "center" })
+        doc.text("LOS PINOS", pageWidth / 2, 13, { align: "center" })
+
+        doc.setFontSize(6)
+        doc.setFont("helvetica", "normal")
+        doc.text("Reporte de Cargas de Agua", pageWidth / 2, 18, { align: "center" })
+
+        // Línea separadora
+        doc.setDrawColor(...azulOscuro)
+        doc.setLineWidth(0.3)
+        doc.line(margin, 24, pageWidth - margin, 24)
+
+        // Título del reporte
+        doc.setFontSize(8)
+        doc.setFont("helvetica", "bold")
+        doc.setTextColor(...negro)
+        doc.text("REPORTE DE CARGAS", pageWidth / 2, 30, { align: "center" })
+
+        // Información del reporte
+        let yPos = 38
+        doc.setFontSize(6)
+        doc.setFont("helvetica", "bold")
+
+        // Información del usuario
+        doc.text(`Usuario: ${userName}`, margin, yPos)
+        doc.text(`Rol: ${userRole}`, margin, yPos + 4)
+
+        // Rango de fechas
+        if (!showAllTime && startDate && endDate) {
+          const formattedStartDate = format(new Date(startDate), "dd/MM/yyyy", { locale: es })
+          const formattedEndDate = format(new Date(endDate), "dd/MM/yyyy", { locale: es })
+          doc.text(`Período: ${formattedStartDate} - ${formattedEndDate}`, margin, yPos + 8)
+          yPos += 12
+        } else {
+          doc.text("Período: Todas las cargas", margin, yPos + 8)
+          yPos += 12
+        }
+
+        doc.text(`Fecha de generación: ${new Date().toLocaleDateString("es-ES")}`, margin, yPos)
+        yPos += 8
+
+        // Resumen en recuadro
+        doc.setDrawColor(...azulOscuro)
+        doc.setLineWidth(0.3)
+        doc.rect(margin, yPos, pageWidth - 2 * margin, 16, "D")
+
+        doc.setFont("helvetica", "bold")
+        doc.setFontSize(6)
+        yPos += 4
+
+        // Primera línea del resumen
+        doc.text(`Total de cargas: ${summary.totalCargas}`, margin + 2, yPos)
+        doc.text(`Cargas pagadas: ${summary.totalPagadas}`, margin + 45, yPos)
+        doc.text(`Cargas pendientes: ${summary.totalDeuda}`, margin + 85, yPos)
+
+        yPos += 4
+        // Segunda línea del resumen
+        doc.text(`Monto pagado: Bs ${summary.montoPagadas}`, margin + 2, yPos)
+        doc.text(`Monto pendiente: Bs ${summary.montoDeuda}`, margin + 45, yPos)
+        doc.text(`Total: Bs ${summary.montoPagadas + summary.montoDeuda}`, margin + 85, yPos)
+
+        yPos += 12
+
+        // Título de la tabla
+        doc.setFont("helvetica", "bold")
+        doc.setFontSize(7)
+        doc.text("DETALLE DE CARGAS:", margin, yPos)
+        yPos += 5
+
+        // Configuración de la tabla
+        const tableWidth = pageWidth - 2 * margin
+        const colWidths = [15, 25, 20, 18, 30, 20] // ID, Fecha, Hora, Estado, Usuario, Costo
+        const rowHeight = 6
+
+        // Encabezados de la tabla
+        doc.setFillColor(...grisClaro)
+        doc.rect(margin, yPos, tableWidth, rowHeight, "F")
+
+        doc.setDrawColor(...azulOscuro)
+        doc.setLineWidth(0.3)
+        doc.rect(margin, yPos, tableWidth, rowHeight)
+
+        doc.setFont("helvetica", "bold")
+        doc.setFontSize(5)
+        doc.setTextColor(...negro)
+
+        let xPos = margin + 1
+        doc.text("ID", xPos, yPos + 4)
+        xPos += colWidths[0]
+        doc.text("FECHA", xPos, yPos + 4)
+        xPos += colWidths[1]
+        doc.text("HORA", xPos, yPos + 4)
+        xPos += colWidths[2]
+        doc.text("ESTADO", xPos, yPos + 4)
+        xPos += colWidths[3]
+        doc.text("USUARIO", xPos, yPos + 4)
+        xPos += colWidths[4]
+        doc.text("COSTO", xPos, yPos + 4)
+
+        yPos += rowHeight
+
+        // Filas de datos
+        doc.setFont("helvetica", "normal")
+        doc.setFontSize(5)
+
+        filteredData.forEach((charge, index) => {
+          if (yPos > 200) {
+            // Si se acerca al final de la página
+            doc.addPage()
+            yPos = 20
+          }
+
+          const fechaCarga = new Date(charge.fechaHora).toLocaleDateString("es-ES", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "2-digit",
+          })
+          const horaCarga = new Date(charge.fechaHora).toLocaleTimeString("es-ES", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+          const usuarioCarga = (charge.usuario?.nombre || "N/A").substring(0, 15)
+          const estadoCarga = charge.estado === "deuda" ? "Pendiente" : "Pagado"
+
+          // Dibujar bordes de la fila
+          doc.setDrawColor(...azulOscuro)
+          doc.setLineWidth(0.2)
+          doc.rect(margin, yPos, tableWidth, rowHeight)
+
+          // Líneas verticales
+          let currentX = margin
+          for (let i = 0; i < colWidths.length - 1; i++) {
+            currentX += colWidths[i]
+            doc.line(currentX, yPos, currentX, yPos + rowHeight)
+          }
+
+          // Contenido de la fila
+          xPos = margin + 1
+          doc.text(charge.id.toString(), xPos, yPos + 4)
+          xPos += colWidths[0]
+          doc.text(fechaCarga, xPos, yPos + 4)
+          xPos += colWidths[1]
+          doc.text(horaCarga, xPos, yPos + 4)
+          xPos += colWidths[2]
+          doc.text(estadoCarga, xPos, yPos + 4)
+          xPos += colWidths[3]
+          doc.text(usuarioCarga, xPos, yPos + 4)
+          xPos += colWidths[4]
+          doc.text(`Bs ${charge.costo || 30}`, xPos, yPos + 4)
+
+          yPos += rowHeight
+        })
+
+        // Pie del reporte
+        yPos += 5
+        doc.setDrawColor(...azulOscuro)
+        doc.line(margin, yPos, pageWidth - margin, yPos)
+
+        yPos += 4
+        doc.setFont("helvetica", "italic")
+        doc.setFontSize(4)
+        doc.text("Este reporte es válido como constancia de cargas.", pageWidth / 2, yPos, { align: "center" })
+        doc.text("Distribuidora de Agua Los Pinos", pageWidth / 2, yPos + 3, { align: "center" })
+        doc.text(`Generado: ${new Date().toLocaleString()}`, pageWidth / 2, yPos + 6, { align: "center" })
+
+        // Guardar PDF
+        const fileName = showAllTime
+          ? `cargas_agua_todas_${new Date().toISOString().split("T")[0]}.pdf`
+          : `cargas_agua_${startDate}_${endDate}.pdf`
+
+        doc.save(fileName)
+      }
+
+      generateChargesPDF()
+
+      Swal.fire({
+        icon: "success",
+        title: "PDF Generado",
+        text: "El reporte de cargas se ha descargado exitosamente.",
+        timer: 2000,
+        showConfirmButton: false,
+      })
+    } catch (error) {
+      console.error("Error al generar el PDF:", error)
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Error al generar el PDF del reporte.",
+      })
+    }
+  }
+
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleString("es-ES", {
       year: "numeric",
@@ -213,12 +459,22 @@ export default function WaterChargesClient() {
   const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE)
 
   return (
-    <div className="container mx-auto px-4 pt-20 pb-8">
+    <div className="container mx-auto px-4 pt-20 pb-8 max-w-5xl">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Cargas de Agua</h1>
-        <Button onClick={() => setShowFilterDialog(true)}>
-          <Filter className="mr-2 h-4 w-4" /> Filtros
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            onClick={handleDownloadAllChargesPDF}
+            variant="outline"
+            className="text-green-600 hover:text-green-800 hover:bg-green-50 border-green-300"
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Descargar PDF
+          </Button>
+          <Button onClick={() => setShowFilterDialog(true)}>
+            <Filter className="mr-2 h-4 w-4" /> Filtros
+          </Button>
+        </div>
       </div>
 
       {/* Resumen de cargas */}
@@ -442,38 +698,168 @@ export default function WaterChargesClient() {
       </Dialog>
 
       <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Detalles del Registro</DialogTitle>
+            <DialogTitle className="flex items-center text-blue-600">
+              <Droplet className="mr-2 h-5 w-5" />
+              Detalles de la Carga de Agua
+            </DialogTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute right-4 top-4"
+              onClick={() => setShowDetailsDialog(false)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <span className="font-medium">Fecha y Hora:</span>
-              <span className="col-span-3">{selectedCharge && formatDate(selectedCharge.fechaHora)}</span>
+
+          {selectedCharge && (
+            <div className="space-y-6">
+              {/* Información General de la Carga */}
+              <Card className="border-blue-200">
+                <CardHeader className="bg-blue-50">
+                  <CardTitle className="flex items-center text-blue-800">
+                    <Droplet className="mr-2 h-5 w-5" />
+                    Información de la Carga
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-600">ID de la Carga</Label>
+                      <div className="flex items-center space-x-2">
+                        <Badge variant="outline" className="font-mono">
+                          #{selectedCharge.id}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-600">Fecha y Hora</Label>
+                      <div className="flex items-center space-x-2">
+                        <Calendar className="h-4 w-4 text-gray-500" />
+                        <span>{formatDate(selectedCharge.fechaHora)}</span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-600">Estado</Label>
+                      <Badge
+                        className={
+                          selectedCharge.estado === "deuda"
+                            ? "bg-red-100 text-red-800 border-red-200"
+                            : "bg-green-100 text-green-800 border-green-200"
+                        }
+                      >
+                        {selectedCharge.estado === "deuda" ? "Pendiente de Pago" : "Pagado"}
+                      </Badge>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-600">Costo</Label>
+                      <div className="text-2xl font-bold text-green-600">Bs {selectedCharge.costo || 30}</div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-600">Tipo de Camión</Label>
+                      <div className="font-medium">
+                        {selectedCharge.tiposDeCamion?.descripcion || "No especificado"}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Información del Usuario */}
+              <Card className="border-purple-200">
+                <CardHeader className="bg-purple-50">
+                  <CardTitle className="flex items-center text-purple-800">
+                    <User className="mr-2 h-5 w-5" />
+                    Información del Usuario
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-600">Nombre</Label>
+                      <div className="font-medium">{selectedCharge.usuario?.nombre || "No disponible"}</div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-600">ID Usuario</Label>
+                      <div className="font-mono text-gray-500">#{selectedCharge.usuario?.id}</div>
+                    </div>
+
+                    {selectedCharge.usuario?.correo && (
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium text-gray-600">Correo Electrónico</Label>
+                        <div className="text-blue-600">{selectedCharge.usuario.correo}</div>
+                      </div>
+                    )}
+
+                    {selectedCharge.usuario?.rol && (
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium text-gray-600">Rol</Label>
+                        <Badge variant="outline">{selectedCharge.usuario.rol}</Badge>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Información Adicional */}
+              <Card className="border-green-200">
+                <CardHeader className="bg-green-50">
+                  <CardTitle className="flex items-center text-green-800">
+                    <FileText className="mr-2 h-5 w-5" />
+                    Detalles Adicionales
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <div className="space-y-4">
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                      <h4 className="font-medium text-blue-800 mb-2">Información del Servicio</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-sm text-blue-600">Costo del Servicio</Label>
+                          <div className="text-xl font-bold text-blue-800">Bs {selectedCharge.costo || 30}</div>
+                        </div>
+                        <div>
+                          <Label className="text-sm text-blue-600">Fecha de Registro</Label>
+                          <div className="font-medium text-blue-800">{formatDate(selectedCharge.fechaHora)}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <h4 className="font-medium text-gray-800 mb-2">Descripción</h4>
+                      <p className="text-gray-600">
+                        Esta carga corresponde al servicio de distribución de agua realizado
+                        {selectedCharge.tiposDeCamion?.descripcion &&
+                          ` con ${selectedCharge.tiposDeCamion.descripcion.toLowerCase()}`}
+                        . El estado actual es:{" "}
+                        <strong>{selectedCharge.estado === "deuda" ? "Pendiente de pago" : "Pagado"}</strong>.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <span className="font-medium">Estado:</span>
-              <span className="col-span-3">
-                {selectedCharge && (
-                  <Badge className={selectedCharge.estado === "deuda" ? "bg-red-500" : "bg-green-500"}>
-                    {selectedCharge.estado}
-                  </Badge>
-                )}
-              </span>
+          )}
+
+          <DialogFooter className="flex justify-between pt-6">
+            <div className="flex space-x-2">
+              {selectedCharge?.estado === "deuda" && (
+                <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">
+                  Acción requerida: Realizar pago
+                </Badge>
+              )}
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <span className="font-medium">Usuario:</span>
-              <span className="col-span-3">{selectedCharge?.usuario?.nombre || "N/A"}</span>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <span className="font-medium">Tipo de Camión:</span>
-              <span className="col-span-3">{selectedCharge?.tiposDeCamion?.descripcion || "N/A"}</span>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <span className="font-medium">Costo:</span>
-              <span className="col-span-3">Bs {selectedCharge?.costo || 30}</span>
-            </div>
-          </div>
+            <Button onClick={() => setShowDetailsDialog(false)}>Cerrar</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

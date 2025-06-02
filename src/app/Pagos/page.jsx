@@ -2,11 +2,28 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { ChevronLeft, ChevronRight, Pencil, Trash2, Plus, Filter, Eye, XCircle } from "lucide-react"
+import {
+  ChevronLeft,
+  ChevronRight,
+  Trash2,
+  Plus,
+  Filter,
+  Eye,
+  Download,
+  Receipt,
+  AlertTriangle,
+  X,
+  User,
+  Calendar,
+  CreditCard,
+  FileText,
+} from "lucide-react"
+import { jsPDF } from "jspdf"
+import Swal from "sweetalert2"
 
-import { Button } from "../../components/components/ui/button"
-import { Input } from "../../components/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/components/ui/table"
+import { Button } from "@/components/components/ui/button"
+import { Input } from "@/components/components/ui/input"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/components/ui/table"
 import {
   Dialog,
   DialogContent,
@@ -15,24 +32,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/components/ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/components/ui/select"
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "../../components/components/ui/card"
-import { Badge } from "../../components/components/ui/badge"
-import { Checkbox } from "../../components/components/ui/checkbox"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/components/ui/select"
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/components/ui/card"
+import { Label } from "@/components/components/ui/label"
+import { Badge } from "@/components//components/ui/badge"
+import { Separator } from "@/components/components/ui/separator"
 
 export default function PagoCargaAgua() {
   const [windowWidth, setWindowWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 0)
-  const [fechaHora, setFechaHora] = useState("")
-  const [usuarioId, setUsuarioId] = useState("")
   const [usuarios, setUsuarios] = useState([])
-  const [cargasDeuda, setCargasDeuda] = useState([])
-  const [selectedCargas, setSelectedCargas] = useState([])
-  const [monto, setMonto] = useState("0")
-  const [showModal, setShowModal] = useState(false)
+  const [showDetailsDialog, setShowDetailsDialog] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [pagos, setPagos] = useState([])
   const [selectedPago, setSelectedPago] = useState(null)
-  const [editMode, setEditMode] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [showFilterModal, setShowFilterModal] = useState(false)
   const [fechaInicio, setFechaInicio] = useState(() => {
@@ -41,6 +53,7 @@ export default function PagoCargaAgua() {
     return yesterday.toISOString().split("T")[0]
   })
   const [fechaFin, setFechaFin] = useState(() => new Date().toISOString().split("T")[0])
+  const [usuarioFiltro, setUsuarioFiltro] = useState("")
 
   const router = useRouter()
   const itemsPerPage = 6
@@ -90,60 +103,10 @@ export default function PagoCargaAgua() {
     }
   }
 
-  const fetchCargasDeuda = async (usuarioId) => {
-    try {
-      const response = await fetch(`https://mi-backendsecond.onrender.com/cargasPropietarioDeuda/${usuarioId}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setCargasDeuda(data)
-      }
-    } catch (error) {
-      console.error("Error al obtener las cargas de agua con deuda:", error)
-    }
-  }
-
-  const handleUsuarioChange = (value) => {
-    setUsuarioId(value)
-    fetchCargasDeuda(value)
-    setSelectedCargas([])
-    setMonto("0")
-  }
-
-  // Función para manejar la selección/deselección de una carga
-  const handleCargaToggle = (cargaId) => {
-    setSelectedCargas((prev) => {
-      // Convertir a string para comparación consistente
-      const cargaIdStr = cargaId.toString()
-
-      // Si ya está seleccionada, la quitamos
-      if (prev.includes(cargaIdStr)) {
-        const newSelected = prev.filter((id) => id !== cargaIdStr)
-        // Actualizar el monto total
-        const montoTotal = calcularMontoTotal(newSelected)
-        setMonto(montoTotal.toString())
-        return newSelected
-      }
-      // Si no está seleccionada, la añadimos
-      else {
-        const newSelected = [...prev, cargaIdStr]
-        // Actualizar el monto total
-        const montoTotal = calcularMontoTotal(newSelected)
-        setMonto(montoTotal.toString())
-        return newSelected
-      }
-    })
-  }
-
-  // Función para calcular el monto total basado en las cargas seleccionadas
-  const calcularMontoTotal = (selectedIds) => {
-    if (!selectedIds || selectedIds.length === 0) return 0
-
-    // Filtrar las cargas seleccionadas y sumar sus costos
-    return cargasDeuda
-      .filter((carga) => selectedIds.includes(carga.id.toString()))
-      .reduce((total, carga) => total + (carga.costo || 30), 0)
+  // Función para generar número de recibo
+  const generarNumeroRecibo = (pagoId, usuarioCI) => {
+    const ci = usuarioCI || "000000"
+    return `R${ci}${pagoId}`
   }
 
   const handleVerPago = async (pago) => {
@@ -154,96 +117,275 @@ export default function PagoCargaAgua() {
       if (response.ok) {
         const data = await response.json()
         setSelectedPago(data)
-        setShowModal(true)
-        setEditMode(false)
+        setShowDetailsDialog(true)
       }
     } catch (error) {
       console.error("Error al obtener la información del pago:", error)
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Error al obtener los detalles del pago",
+      })
     }
   }
 
-  const handleEditPago = async (pago) => {
+  const handleDescargarPDF = async (pago) => {
     try {
       const response = await fetch(`https://mi-backendsecond.onrender.com/pagoscargagua/${pago.id}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
       if (response.ok) {
         const data = await response.json()
-        setSelectedPago(data)
-        setFechaHora(new Date(data.fechaHora).toISOString().substring(0, 16))
-        setMonto(data.monto.toString())
-        setUsuarioId(data.usuarioId)
-        // Convertir los IDs a string para consistencia
-        setSelectedCargas(data.cargaAguaIds.map((id) => id.toString()))
-        setShowModal(true)
-        setEditMode(true)
+
+        const datosRecibo = {
+          numeroRecibo: generarNumeroRecibo(data.id, data.usuario?.ci),
+          fechaHora: new Date(data.fechaHora).toLocaleString(),
+          cliente: data.usuario?.nombre || data.usuario?.username || "N/A",
+          ci: data.usuario?.ci || "No disponible",
+          correo: data.usuario?.correo || "No disponible",
+          tipoCliente: data.usuario?.rol || "Cliente",
+          numeroCargas: data.cargas?.length || data.cargaAguaIds?.length || 0,
+          montoTotal: data.monto,
+          cargasDetalle: data.cargas || [],
+          pagoId: data.id,
+        }
+
+        // Función para generar PDF del recibo
+        const generarPDFRecibo = (datosRecibo) => {
+          const doc = new jsPDF({
+            format: [139.7, 215.9], // Half letter size in mm
+            orientation: "portrait",
+          })
+
+          const pageWidth = doc.internal.pageSize.getWidth()
+          const margin = 8
+
+          // Colores
+          const azulOscuro = [0, 51, 102]
+          const grisClaro = [240, 240, 240]
+          const negro = [0, 0, 0]
+
+          // Encabezado con logo y título
+          doc.setFillColor(...grisClaro)
+          doc.rect(0, 0, pageWidth, 22, "F")
+
+          // Logo/Título de la empresa
+          doc.setFontSize(10)
+          doc.setTextColor(...azulOscuro)
+          doc.setFont("helvetica", "bold")
+          doc.text("DISTRIBUIDORA DE AGUA", pageWidth / 2, 7, { align: "center" })
+          doc.text("LOS PINOS", pageWidth / 2, 13, { align: "center" })
+
+          doc.setFontSize(6)
+          doc.setFont("helvetica", "normal")
+          doc.text("Servicio de distribución de agua potable", pageWidth / 2, 18, { align: "center" })
+
+          // Línea separadora
+          doc.setDrawColor(...azulOscuro)
+          doc.setLineWidth(0.3)
+          doc.line(margin, 24, pageWidth - margin, 24)
+
+          // Título del recibo
+          doc.setFontSize(8)
+          doc.setFont("helvetica", "bold")
+          doc.setTextColor(...negro)
+          doc.text("COMPROBANTE DE PAGO", pageWidth / 2, 30, { align: "center" })
+
+          // Información del recibo en doble columna
+          let yPos = 38
+          const lineHeight = 4
+          const colWidth = (pageWidth - 2 * margin) / 2
+
+          // Dibujar recuadro para la información
+          doc.setDrawColor(...azulOscuro)
+          doc.setLineWidth(0.3)
+          doc.rect(margin, yPos - 2, pageWidth - 2 * margin, 16)
+
+          // Primera columna de información
+          doc.setFont("helvetica", "bold")
+          doc.setFontSize(6)
+
+          // Columna izquierda
+          doc.text("Número:", margin + 2, yPos + 2)
+          doc.setFont("helvetica", "normal")
+          doc.text(datosRecibo.numeroRecibo, margin + 18, yPos + 2)
+
+          doc.setFont("helvetica", "bold")
+          doc.text("Fecha:", margin + 2, yPos + 6)
+          doc.setFont("helvetica", "normal")
+          doc.text(datosRecibo.fechaHora, margin + 18, yPos + 6)
+
+          doc.setFont("helvetica", "bold")
+          doc.text("Cliente:", margin + 2, yPos + 10)
+          doc.setFont("helvetica", "normal")
+          const clienteText =
+            datosRecibo.cliente.length > 20 ? datosRecibo.cliente.substring(0, 20) + "..." : datosRecibo.cliente
+          doc.text(clienteText, margin + 18, yPos + 10)
+
+          // Columna derecha
+          const col2X = pageWidth / 2 + 2
+
+          doc.setFont("helvetica", "bold")
+          doc.text("CI:", col2X, yPos + 2)
+          doc.setFont("helvetica", "normal")
+          doc.text(datosRecibo.ci || "No disponible", col2X + 12, yPos + 2)
+
+          doc.setFont("helvetica", "bold")
+          doc.text("Cargas:", col2X, yPos + 6)
+          doc.setFont("helvetica", "normal")
+          doc.text(datosRecibo.numeroCargas.toString(), col2X + 16, yPos + 6)
+
+          doc.setFont("helvetica", "bold")
+          doc.text("Total:", col2X, yPos + 10)
+          doc.setFont("helvetica", "normal")
+          doc.text(`Bs ${datosRecibo.montoTotal.toFixed(2)}`, col2X + 16, yPos + 10)
+
+          // Detalle de cargas pagadas en tabla
+          yPos = 58
+          doc.setFont("helvetica", "bold")
+          doc.setFontSize(7)
+          doc.text("DETALLE DE CARGAS PAGADAS:", margin, yPos)
+
+          yPos += 5
+
+          // Configuración de la tabla
+          const tableWidth = pageWidth - 2 * margin
+          const colWidths = [22, 30, 42, 18] // Fecha, Hora, Usuario, Costo
+          const rowHeight = 7
+
+          // Encabezados de la tabla
+          doc.setFillColor(...grisClaro)
+          doc.rect(margin, yPos, tableWidth, rowHeight, "F")
+
+          doc.setDrawColor(...azulOscuro)
+          doc.setLineWidth(0.3)
+          doc.rect(margin, yPos, tableWidth, rowHeight)
+
+          doc.setFont("helvetica", "bold")
+          doc.setFontSize(5)
+          doc.setTextColor(...negro)
+
+          let xPos = margin + 1
+          doc.text("FECHA", xPos, yPos + 4)
+          xPos += colWidths[0]
+          doc.text("HORA", xPos, yPos + 4)
+          xPos += colWidths[1]
+          doc.text("USUARIO", xPos, yPos + 4)
+          xPos += colWidths[2]
+          doc.text("COSTO", xPos, yPos + 4)
+
+          yPos += rowHeight
+
+          // Filas de datos
+          doc.setFont("helvetica", "normal")
+          doc.setFontSize(5)
+
+          const maxCargasToShow = Math.min(datosRecibo.cargasDetalle.length, 12)
+          const cargasToShow = datosRecibo.cargasDetalle.slice(0, maxCargasToShow)
+
+          cargasToShow.forEach((carga, index) => {
+            const fechaCarga = new Date(carga.fechaHora).toLocaleDateString("es-ES", {
+              day: "2-digit",
+              month: "2-digit",
+              year: "2-digit",
+            })
+            const horaCarga = new Date(carga.fechaHora).toLocaleTimeString("es-ES", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+            const usuarioCarga = (datosRecibo.cliente || "N/A").substring(0, 15)
+
+            // Dibujar bordes de la fila
+            doc.setDrawColor(...azulOscuro)
+            doc.setLineWidth(0.2)
+            doc.rect(margin, yPos, tableWidth, rowHeight)
+
+            // Líneas verticales
+            let currentX = margin
+            for (let i = 0; i < colWidths.length - 1; i++) {
+              currentX += colWidths[i]
+              doc.line(currentX, yPos, currentX, yPos + rowHeight)
+            }
+
+            // Contenido de la fila
+            xPos = margin + 1
+            doc.text(fechaCarga, xPos, yPos + 4)
+            xPos += colWidths[0]
+            doc.text(horaCarga, xPos, yPos + 4)
+            xPos += colWidths[1]
+            doc.text(usuarioCarga, xPos, yPos + 4)
+            xPos += colWidths[2]
+            doc.text(`Bs ${carga.costo}`, xPos, yPos + 4)
+
+            yPos += rowHeight
+          })
+
+          // Si hay más cargas de las que se muestran, indicarlo
+          if (datosRecibo.cargasDetalle.length > maxCargasToShow) {
+            yPos += 2
+            doc.setFont("helvetica", "italic")
+            doc.setFontSize(4)
+            doc.text(`... y ${datosRecibo.cargasDetalle.length - maxCargasToShow} cargas más`, margin, yPos)
+            yPos += 3
+          }
+
+          // Pie del recibo
+          yPos += 5
+          doc.setDrawColor(...azulOscuro)
+          doc.line(margin, yPos, pageWidth - margin, yPos)
+
+          yPos += 4
+          doc.setFont("helvetica", "italic")
+          doc.setFontSize(4)
+          doc.text("Este comprobante es válido como constancia de pago.", pageWidth / 2, yPos, { align: "center" })
+          doc.text("Distribuidora de Agua Los Pinos", pageWidth / 2, yPos + 3, { align: "center" })
+          doc.text(`Generado: ${new Date().toLocaleString()}`, pageWidth / 2, yPos + 6, { align: "center" })
+
+          // Guardar PDF
+          doc.save(`recibo_${datosRecibo.numeroRecibo}.pdf`)
+        }
+
+        generarPDFRecibo(datosRecibo)
       }
     } catch (error) {
-      console.error("Error al cargar los datos para editar el pago:", error)
+      console.error("Error al obtener la información del pago:", error)
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Error al generar el PDF",
+      })
     }
   }
 
-  const handleDeletePago = async (pagoId) => {
+  const handleDeletePago = async () => {
+    if (!selectedPago) return
+
     try {
-      const response = await fetch(`https://mi-backendsecond.onrender.com/pagoscargagua/${pagoId}`, {
+      const response = await fetch(`https://mi-backendsecond.onrender.com/pagoscargagua/${selectedPago.id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
       if (response.ok) {
-        setPagos(pagos.filter((pago) => pago.id !== pagoId))
+        setPagos(pagos.filter((pago) => pago.id !== selectedPago.id))
         setShowDeleteModal(false)
+
+        Swal.fire({
+          icon: "success",
+          title: "Pago eliminado",
+          text: "El pago ha sido eliminado exitosamente y las cargas han vuelto a estado de deuda.",
+          timer: 3000,
+          showConfirmButton: false,
+        })
+
+        fetchPagos()
       }
     } catch (error) {
       console.error("Error al eliminar el pago:", error)
-    }
-  }
-
-  const handleSubmit = async (event) => {
-    event.preventDefault()
-
-    if (!fechaHora || !usuarioId || selectedCargas.length === 0 || !monto) {
-      return
-    }
-
-    const nuevoPago = {
-      usuarioId: Number.parseInt(usuarioId),
-      monto: Number.parseFloat(monto),
-      cargaAguaIds: selectedCargas.map((id) => Number.parseInt(id)),
-      fechaHora: new Date(fechaHora).toISOString(),
-    }
-
-    try {
-      const url = editMode
-        ? `https://mi-backendsecond.onrender.com/pagoscargagua/${selectedPago.id}`
-        : "https://mi-backendsecond.onrender.com/pagoscargagua"
-
-      const method = editMode ? "PUT" : "POST"
-
-      const response = await fetch(url, {
-        method: method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        body: JSON.stringify(nuevoPago),
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Error al eliminar el pago",
       })
-
-      if (response.ok) {
-        const data = await response.json()
-        if (editMode) {
-          setPagos(pagos.map((pago) => (pago.id === selectedPago.id ? data : pago)))
-        } else {
-          setPagos([...pagos, data])
-        }
-        setShowModal(false)
-        setFechaHora("")
-        setUsuarioId("")
-        setMonto("0")
-        setSelectedCargas([])
-        setEditMode(false)
-      }
-    } catch (error) {
-      console.error("Error al registrar el pago de carga de agua:", error)
     }
   }
 
@@ -252,8 +394,15 @@ export default function PagoCargaAgua() {
       const fechaPago = new Date(pago.fechaHora)
       const inicio = new Date(fechaInicio)
       const fin = new Date(fechaFin)
-      fin.setHours(23, 59, 59, 999) // Set to end of day
-      return fechaPago >= inicio && fechaPago <= fin
+      fin.setHours(23, 59, 59, 999)
+
+      const cumpleFecha = fechaPago >= inicio && fechaPago <= fin
+      const cumpleUsuario =
+        !usuarioFiltro ||
+        (pago.usuario?.nombre && pago.usuario.nombre.toLowerCase().includes(usuarioFiltro.toLowerCase())) ||
+        (pago.usuario?.username && pago.usuario.username.toLowerCase().includes(usuarioFiltro.toLowerCase()))
+
+      return cumpleFecha && cumpleUsuario
     })
   }
 
@@ -264,26 +413,12 @@ export default function PagoCargaAgua() {
   const currentPagos = pagosFiltrados.slice(indexOfFirstItem, indexOfLastItem)
 
   return (
-    <div className="container mx-auto px-4 py-8 mt-16">
+    <div className="container mx-auto px-4 py-8 mt-16 max-w-6xl">
       <h1 className="text-2xl font-bold mb-6">Gestión de Pagos de Carga de Agua</h1>
 
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-start items-center mb-6">
         <Button onClick={() => setShowFilterModal(true)}>
           <Filter className="mr-2 h-4 w-4" /> Filtros
-        </Button>
-        <Button
-          onClick={() => {
-            setShowModal(true)
-            setEditMode(false)
-            setSelectedPago(null)
-            setFechaHora("")
-            setUsuarioId("")
-            setMonto("0")
-            setSelectedCargas([])
-          }}
-          className="bg-green-700 hover:bg-green-800 text-white"
-        >
-          <Plus className="mr-2 h-4 w-4" /> Registrar Pago
         </Button>
       </div>
 
@@ -298,16 +433,22 @@ export default function PagoCargaAgua() {
                 <Card key={pago.id} className="border border-gray-200">
                   <CardContent className="p-4">
                     <p>
-                      <strong>ID:</strong> {pago.id}
-                    </p>
-                    <p>
                       <strong>Usuario:</strong> {pago.usuario?.nombre || pago.usuario?.username || "N/A"}
                     </p>
                     <p>
                       <strong>Monto:</strong> Bs {pago.monto}
                     </p>
                     <p>
-                      <strong>Fecha:</strong> {new Date(pago.fechaHora).toLocaleString()}
+                      <strong>Fecha:</strong>{" "}
+                      {new Date(pago.fechaHora).toLocaleDateString("es-ES", {
+                        weekday: "long",
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                      })}
+                    </p>
+                    <p>
+                      <strong>Cargas:</strong> {pago.cargas?.length || pago.cargaAguaIds?.length || 0}
                     </p>
                   </CardContent>
                   <CardFooter className="flex justify-between">
@@ -322,10 +463,10 @@ export default function PagoCargaAgua() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => handleEditPago(pago)}
-                      className="bg-amber-100 hover:bg-amber-200 text-amber-800 border-amber-200"
+                      onClick={() => handleDescargarPDF(pago)}
+                      className="bg-green-100 hover:bg-green-200 text-green-800 border-green-200"
                     >
-                      <Pencil className="h-4 w-4" />
+                      <Download className="h-4 w-4" />
                     </Button>
                     <Button
                       size="sm"
@@ -346,9 +487,9 @@ export default function PagoCargaAgua() {
             <Table>
               <TableHeader className="bg-gray-200 border-b-2 border-gray-300 shadow-md">
                 <TableRow>
-                  <TableHead className="font-bold text-gray-700 border-r border-gray-300">ID</TableHead>
                   <TableHead className="font-bold text-gray-700 border-r border-gray-300">Usuario</TableHead>
                   <TableHead className="font-bold text-gray-700 border-r border-gray-300">Monto</TableHead>
+                  <TableHead className="font-bold text-gray-700 border-r border-gray-300">Cargas</TableHead>
                   <TableHead className="font-bold text-gray-700 border-r border-gray-300">Fecha</TableHead>
                   <TableHead className="font-bold text-gray-700">Acciones</TableHead>
                 </TableRow>
@@ -356,10 +497,17 @@ export default function PagoCargaAgua() {
               <TableBody>
                 {currentPagos.map((pago) => (
                   <TableRow key={pago.id}>
-                    <TableCell>{pago.id}</TableCell>
                     <TableCell>{pago.usuario?.nombre || pago.usuario?.username || "N/A"}</TableCell>
                     <TableCell>Bs {pago.monto}</TableCell>
-                    <TableCell>{new Date(pago.fechaHora).toLocaleString()}</TableCell>
+                    <TableCell>{pago.cargas?.length || pago.cargaAguaIds?.length || 0}</TableCell>
+                    <TableCell>
+                      {new Date(pago.fechaHora).toLocaleDateString("es-ES", {
+                        weekday: "long",
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                      })}
+                    </TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
                         <Button
@@ -373,10 +521,10 @@ export default function PagoCargaAgua() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => handleEditPago(pago)}
-                          className="bg-amber-100 hover:bg-amber-200 text-amber-800 border-amber-200"
+                          onClick={() => handleDescargarPDF(pago)}
+                          className="bg-green-100 hover:bg-green-200 text-green-800 border-green-200"
                         >
-                          <Pencil className="h-4 w-4" />
+                          <Download className="h-4 w-4" />
                         </Button>
                         <Button
                           size="sm"
@@ -414,190 +562,349 @@ export default function PagoCargaAgua() {
         </Button>
       </div>
 
-      <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent>
+      {/* Diálogo de Detalles del Pago */}
+      <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
-              {editMode ? "Editar Pago" : selectedPago ? "Detalles del Pago" : "Registrar Pago"}
+            <DialogTitle className="flex items-center text-blue-600">
+              <FileText className="mr-2 h-5 w-5" />
+              Detalles del Pago
             </DialogTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute right-4 top-4"
+              onClick={() => setShowDetailsDialog(false)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
           </DialogHeader>
-          {selectedPago && !editMode ? (
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <span className="font-medium">Fecha y Hora:</span>
-                <span className="col-span-3">{new Date(selectedPago.fechaHora).toLocaleString()}</span>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <span className="font-medium">Monto:</span>
-                <span className="col-span-3">Bs {selectedPago.monto}</span>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <span className="font-medium">Usuario:</span>
-                <span className="col-span-3">
-                  {selectedPago.usuario?.nombre || selectedPago.usuario?.username || "N/A"}
-                </span>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <span className="font-medium">Cargas:</span>
-                <span className="col-span-3">{selectedPago.cargaAguaIds?.join(", ") || "N/A"}</span>
-              </div>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit}>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <label htmlFor="fechaHora" className="text-right">
-                    Fecha y Hora:
-                  </label>
-                  <Input
-                    id="fechaHora"
-                    type="datetime-local"
-                    value={fechaHora}
-                    onChange={(e) => setFechaHora(e.target.value)}
-                    className="col-span-3"
-                    required
-                  />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <label htmlFor="usuario" className="text-right">
-                    Usuario:
-                  </label>
-                  <Select value={usuarioId} onValueChange={handleUsuarioChange}>
-                    <SelectTrigger className="col-span-3">
-                      <SelectValue placeholder="Selecciona un usuario" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {usuarios.map((usuario) => (
-                        <SelectItem key={usuario.id} value={usuario.id.toString()}>
-                          {usuario.username}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <label className="text-right">Cargas de Agua con Deuda:</label>
-                  <div className="col-span-3">
-                    <div className="border rounded-md p-2 max-h-60 overflow-y-auto">
-                      {cargasDeuda.length === 0 ? (
-                        <p className="text-center text-gray-500 py-2">No hay cargas con deuda para este usuario</p>
-                      ) : (
-                        cargasDeuda.map((carga) => (
-                          <div key={carga.id} className="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded">
-                            <Checkbox
-                              id={`carga-${carga.id}`}
-                              checked={selectedCargas.includes(carga.id.toString())}
-                              onCheckedChange={() => handleCargaToggle(carga.id)}
-                            />
-                            <label htmlFor={`carga-${carga.id}`} className="flex-1 cursor-pointer text-sm">
-                              Carga #{carga.id} - Costo: Bs {carga.costo || 30} - Fecha:{" "}
-                              {new Date(carga.fechaHora).toLocaleDateString()}
-                            </label>
-                          </div>
-                        ))
-                      )}
+
+          {selectedPago && (
+            <div className="space-y-6">
+              {/* Información General del Pago */}
+              <Card className="border-blue-200">
+                <CardHeader className="bg-blue-50">
+                  <CardTitle className="flex items-center text-blue-800">
+                    <CreditCard className="mr-2 h-5 w-5" />
+                    Información del Pago
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-600">ID del Pago</Label>
+                      <div className="flex items-center space-x-2">
+                        <Badge variant="outline" className="font-mono">
+                          #{selectedPago.id}
+                        </Badge>
+                      </div>
                     </div>
 
-                    {selectedCargas.length > 0 && (
-                      <div className="mt-2">
-                        <p className="text-sm font-medium mb-1">Cargas seleccionadas: {selectedCargas.length}</p>
-                        <div className="flex flex-wrap gap-2">
-                          {selectedCargas.map((id) => {
-                            const carga = cargasDeuda.find((c) => c.id.toString() === id)
-                            return (
-                              <Badge key={id} variant="outline" className="px-2 py-1 flex items-center gap-1">
-                                <span>
-                                  Carga #{id} - Bs {carga?.costo || 30}
-                                </span>
-                                <button
-                                  type="button"
-                                  className="text-red-500 hover:text-red-700"
-                                  onClick={() => handleCargaToggle(id)}
-                                >
-                                  <span className="sr-only">Eliminar</span>
-                                  <XCircle className="h-3 w-3" />
-                                </button>
-                              </Badge>
-                            )
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-600">Número de Recibo</Label>
+                      <div className="font-mono text-blue-600 font-medium">
+                        {generarNumeroRecibo(selectedPago.id, selectedPago.usuario?.ci)}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-600">Monto Total</Label>
+                      <div className="text-2xl font-bold text-green-600">Bs {selectedPago.monto?.toFixed(2)}</div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-600">Fecha y Hora</Label>
+                      <div className="flex items-center space-x-2">
+                        <Calendar className="h-4 w-4 text-gray-500" />
+                        <span>
+                          {new Date(selectedPago.fechaHora).toLocaleString("es-ES", {
+                            weekday: "long",
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
                           })}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-600">Cargas Pagadas</Label>
+                      <Badge variant="secondary" className="text-lg">
+                        {selectedPago.cargas?.length || selectedPago.cargaAguaIds?.length || 0} cargas
+                      </Badge>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-600">Estado</Label>
+                      <Badge className="bg-green-100 text-green-800 border-green-200">Pagado</Badge>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Información del Cliente */}
+              <Card className="border-purple-200">
+                <CardHeader className="bg-purple-50">
+                  <CardTitle className="flex items-center text-purple-800">
+                    <User className="mr-2 h-5 w-5" />
+                    Información del Cliente
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-600">Nombre</Label>
+                      <div className="font-medium">
+                        {selectedPago.usuario?.nombre || selectedPago.usuario?.username || "N/A"}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-600">Cédula de Identidad</Label>
+                      <div className="font-mono">{selectedPago.usuario?.ci || "No disponible"}</div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-600">Correo Electrónico</Label>
+                      <div className="text-blue-600">{selectedPago.usuario?.correo || "No disponible"}</div>
+                    </div>
+
+                    
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-600">Rol</Label>
+                      <Badge variant="outline">{selectedPago.usuario?.rol || "Cliente"}</Badge>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-600">ID Usuario</Label>
+                      <div className="font-mono text-gray-500">#{selectedPago.usuario?.id}</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Detalle de Cargas Pagadas */}
+              <Card className="border-green-200">
+                <CardHeader className="bg-green-50">
+                  <CardTitle className="flex items-center text-green-800">
+                    <Receipt className="mr-2 h-5 w-5" />
+                    Detalle de Cargas Pagadas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6">
+                  {selectedPago.cargas && selectedPago.cargas.length > 0 ? (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                        <div className="bg-blue-50 p-3 rounded-lg">
+                          <div className="text-sm text-blue-600 font-medium">Total de Cargas</div>
+                          <div className="text-2xl font-bold text-blue-800">{selectedPago.cargas.length}</div>
+                        </div>
+                        <div className="bg-green-50 p-3 rounded-lg">
+                          <div className="text-sm text-green-600 font-medium">Monto Total</div>
+                          <div className="text-2xl font-bold text-green-800">
+                            Bs {selectedPago.cargas.reduce((total, carga) => total + (carga.costo || 30), 0).toFixed(2)}
+                          </div>
+                        </div>
+                        <div className="bg-purple-50 p-3 rounded-lg">
+                          <div className="text-sm text-purple-600 font-medium">Promedio por Carga</div>
+                          <div className="text-2xl font-bold text-purple-800">
+                            Bs{" "}
+                            {(
+                              selectedPago.cargas.reduce((total, carga) => total + (carga.costo || 30), 0) /
+                              selectedPago.cargas.length
+                            ).toFixed(2)}
+                          </div>
                         </div>
                       </div>
-                    )}
-                  </div>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <label htmlFor="monto" className="text-right">
-                    Monto Total:
-                  </label>
-                  <div className="col-span-3 flex items-center">
-                    <Input
-                      id="monto"
-                      type="number"
-                      step="0.01"
-                      value={monto}
-                      onChange={(e) => setMonto(e.target.value)}
-                      className="mr-2"
-                      readOnly
-                    />
-                    <Badge className="bg-green-600">Calculado automáticamente</Badge>
-                  </div>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button type="submit" disabled={selectedCargas.length === 0}>
-                  {editMode ? "Guardar Cambios" : "Registrar Pago"}
-                </Button>
-              </DialogFooter>
-            </form>
+
+                      <Separator />
+
+                      <div className="space-y-3">
+                        <h4 className="font-medium text-gray-800">Lista de Cargas:</h4>
+                        <div className="max-h-64 overflow-y-auto border rounded-lg">
+                          <Table>
+                            <TableHeader className="bg-gray-50">
+                              <TableRow>
+                                <TableHead className="font-medium">ID Carga</TableHead>
+                                <TableHead className="font-medium">Fecha</TableHead>
+                                <TableHead className="font-medium">Hora</TableHead>
+                                <TableHead className="font-medium">Costo</TableHead>
+                                <TableHead className="font-medium">Estado</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {selectedPago.cargas.map((carga, index) => (
+                                <TableRow key={carga.id} className={index % 2 === 0 ? "bg-gray-50" : "bg-white"}>
+                                  <TableCell className="font-mono">#{carga.id}</TableCell>
+                                  <TableCell>
+                                    {new Date(carga.fechaHora).toLocaleDateString("es-ES", {
+                                      day: "2-digit",
+                                      month: "2-digit",
+                                      year: "numeric",
+                                    })}
+                                  </TableCell>
+                                  <TableCell>
+                                    {new Date(carga.fechaHora).toLocaleTimeString("es-ES", {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })}
+                                  </TableCell>
+                                  <TableCell className="font-medium text-green-600">Bs {carga.costo || 30}</TableCell>
+                                  <TableCell>
+                                    <Badge className="bg-green-100 text-green-800 border-green-200">Pagado</Badge>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <Receipt className="mx-auto h-12 w-12 text-gray-300 mb-4" />
+                      <p>No se encontraron detalles de cargas para este pago</p>
+                      <p className="text-sm mt-2">Cargas registradas: {selectedPago.cargaAguaIds?.length || 0}</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           )}
+
+          <DialogFooter className="flex justify-between pt-6">
+            <div className="flex space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => selectedPago && handleDescargarPDF(selectedPago)}
+                className="flex items-center"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Descargar PDF
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowDetailsDialog(false)
+                  setShowDeleteModal(true)
+                }}
+                className="flex items-center text-red-600 border-red-200 hover:bg-red-50"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Eliminar Pago
+              </Button>
+            </div>
+            <Button onClick={() => setShowDetailsDialog(false)}>Cerrar</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
+      {/* Modal de confirmación para eliminar */}
       <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
-        <DialogContent>
+        <DialogContent className="border-2 border-gray-300">
           <DialogHeader>
-            <DialogTitle>Confirmar Eliminación</DialogTitle>
-            <DialogDescription>¿Está seguro que desea eliminar este pago?</DialogDescription>
+            <DialogTitle className="flex items-center text-red-600">
+              <AlertTriangle className="mr-2 h-5 w-5" />
+              Confirmar Eliminación
+            </DialogTitle>
+            <DialogDescription>
+              ¿Está seguro que desea eliminar este pago? Esta acción no se puede deshacer.
+            </DialogDescription>
           </DialogHeader>
+
+          {selectedPago && (
+            <div className="space-y-4">
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <h4 className="font-medium text-yellow-800 mb-2">⚠️ Advertencia:</h4>
+                <p className="text-sm text-yellow-700 mb-3">
+                  Al eliminar este pago, las siguientes cargas volverán al estado de "deuda":
+                </p>
+
+                {selectedPago.cargas && selectedPago.cargas.length > 0 ? (
+                  <div className="max-h-32 overflow-y-auto border rounded p-2 bg-white">
+                    {selectedPago.cargas.map((carga, index) => (
+                      <div key={carga.id} className="flex justify-between text-sm py-1 border-b last:border-b-0">
+                        <span>
+                          Carga #{carga.id} - {new Date(carga.fechaHora).toLocaleDateString()}
+                        </span>
+                        <span className="font-medium text-red-600">Bs {carga.costo}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-600 bg-white p-2 rounded border">
+                    {selectedPago.cargaAguaIds?.length || 0} cargas volverán al estado de deuda
+                  </div>
+                )}
+
+                <div className="mt-3 pt-2 border-t border-yellow-200">
+                  <div className="flex justify-between font-medium text-yellow-800">
+                    <span>Total del pago a eliminar:</span>
+                    <span>Bs {selectedPago.monto}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDeleteModal(false)}>
               Cancelar
             </Button>
-            <Button variant="destructive" onClick={() => handleDeletePago(selectedPago.id)}>
-              Eliminar
+            <Button variant="destructive" onClick={handleDeletePago}>
+              <Trash2 className="mr-2 h-4 w-4" />
+              Eliminar Pago
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
+      {/* Modal de filtros */}
       <Dialog open={showFilterModal} onOpenChange={setShowFilterModal}>
-        <DialogContent>
+        <DialogContent className="border-2 border-gray-300">
           <DialogHeader>
             <DialogTitle>Filtrar Pagos</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
-              <label htmlFor="fechaInicio" className="text-right">
+              <Label htmlFor="usuarioFiltro" className="text-right">
+                Usuario:
+              </Label>
+              <Input
+                id="usuarioFiltro"
+                type="text"
+                placeholder="Buscar por nombre..."
+                value={usuarioFiltro}
+                onChange={(e) => setUsuarioFiltro(e.target.value)}
+                className="col-span-3 border-2 border-gray-300"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="fechaInicio" className="text-right">
                 Fecha Inicio:
-              </label>
+              </Label>
               <Input
                 id="fechaInicio"
                 type="date"
                 value={fechaInicio}
                 onChange={(e) => setFechaInicio(e.target.value)}
-                className="col-span-3"
+                className="col-span-3 border-2 border-gray-300"
               />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <label htmlFor="fechaFin" className="text-right">
+              <Label htmlFor="fechaFin" className="text-right">
                 Fecha Fin:
-              </label>
+              </Label>
               <Input
                 id="fechaFin"
                 type="date"
                 value={fechaFin}
                 onChange={(e) => setFechaFin(e.target.value)}
-                className="col-span-3"
+                className="col-span-3 border-2 border-gray-300"
               />
             </div>
           </div>
@@ -607,6 +914,7 @@ export default function PagoCargaAgua() {
                 setCurrentPage(1)
                 setShowFilterModal(false)
               }}
+              className="border-2 border-gray-300"
             >
               Aplicar Filtros
             </Button>

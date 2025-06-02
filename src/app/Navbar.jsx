@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Home, Package, Users, CreditCard, User, LogOut, Menu, ChevronDown } from "lucide-react"
+import { Home, Package, Users, CreditCard, User, LogOut, Menu, ChevronDown, BarChart3, TrendingUp } from "lucide-react"
 import Link from "next/link"
 import { Button } from "../components/components/ui/button"
 import {
@@ -78,7 +78,7 @@ export default function Navbar() {
               { href: "/UsuariosCliente", icon: User, title: "Gestión de Clientes" },
             ]}
           />
-         <SubMenu
+          <SubMenu
             title="Cargas de agua"
             icon={CreditCard}
             items={[
@@ -89,9 +89,14 @@ export default function Navbar() {
           <NavLink href="/Pagos" icon={CreditCard}>
             Gestión de Pagos
           </NavLink>
-          <NavLink href="/Reportes" icon={CreditCard}>
-            Reportes
-          </NavLink>
+          <SubMenu
+            title="Reportes y Estadísticas"
+            icon={BarChart3}
+            items={[
+              { href: "/Reportes2", icon: BarChart3, title: "Reportes" },
+              { href: "/Dashboard", icon: TrendingUp, title: "Estadísticas del Sistema" },
+            ]}
+          />
         </>
       )}
       {rol === "propietario" && (

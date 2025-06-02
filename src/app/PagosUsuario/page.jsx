@@ -310,11 +310,16 @@ export default function UsuarioDetalles() {
     return `R${ci}${pagoId}`
   }
 
-  // Función para generar PDF del recibo
+  // Función para generar PDF del recibo - Versión 3 corregida
   const generarPDFRecibo = (datosRecibo) => {
-    const doc = new jsPDF()
+    // Create a half-letter sized PDF (5.5" x 8.5")
+    const doc = new jsPDF({
+      format: [139.7, 215.9], // Half letter size in mm
+      orientation: "portrait",
+    })
+
     const pageWidth = doc.internal.pageSize.getWidth()
-    const margin = 20
+    const margin = 8
 
     // Colores
     const azulOscuro = [0, 51, 102]
@@ -323,106 +328,181 @@ export default function UsuarioDetalles() {
 
     // Encabezado con logo y título
     doc.setFillColor(...grisClaro)
-    doc.rect(0, 0, pageWidth, 40, "F")
+    doc.rect(0, 0, pageWidth, 22, "F")
 
     // Logo/Título de la empresa
-    doc.setFontSize(20)
+    doc.setFontSize(10)
     doc.setTextColor(...azulOscuro)
     doc.setFont("helvetica", "bold")
-    doc.text("DISTRIBUIDORA DE AGUA", pageWidth / 2, 15, { align: "center" })
-    doc.text("LOS PINOS", pageWidth / 2, 25, { align: "center" })
+    doc.text("DISTRIBUIDORA DE AGUA", pageWidth / 2, 7, { align: "center" })
+    doc.text("LOS PINOS", pageWidth / 2, 13, { align: "center" })
 
-    doc.setFontSize(12)
+    doc.setFontSize(6)
     doc.setFont("helvetica", "normal")
-    doc.text("Servicio de distribución de agua potable", pageWidth / 2, 32, { align: "center" })
+    doc.text("Servicio de distribución de agua potable", pageWidth / 2, 18, { align: "center" })
 
     // Línea separadora
     doc.setDrawColor(...azulOscuro)
-    doc.setLineWidth(1)
-    doc.line(margin, 45, pageWidth - margin, 45)
+    doc.setLineWidth(0.3)
+    doc.line(margin, 24, pageWidth - margin, 24)
 
     // Título del recibo
-    doc.setFontSize(16)
+    doc.setFontSize(8)
     doc.setFont("helvetica", "bold")
     doc.setTextColor(...negro)
-    doc.text("COMPROBANTE DE PAGO", pageWidth / 2, 60, { align: "center" })
+    doc.text("COMPROBANTE DE PAGO", pageWidth / 2, 30, { align: "center" })
 
-    // Información del recibo
-    let yPos = 80
-    const lineHeight = 8
-    const labelWidth = 60
-
-    const campos = [
-      { label: "Número de Recibo:", valor: datosRecibo.numeroRecibo },
-      { label: "Fecha y hora:", valor: datosRecibo.fechaHora },
-      { label: "Cliente:", valor: datosRecibo.cliente },
-      { label: "Tipo de cliente:", valor: datosRecibo.tipoCliente },
-      { label: "Número de cargas:", valor: datosRecibo.numeroCargas.toString() },
-      { label: "Importe total:", valor: `Bs ${datosRecibo.montoTotal.toFixed(2)}` },
-      { label: "Moneda:", valor: "BOLIVIANOS" },
-      { label: "Método de pago:", valor: "Sistema de pagos Los Pinos" },
-    ]
+    // Información del recibo en doble columna
+    let yPos = 38
+    const lineHeight = 4
+    const colWidth = (pageWidth - 2 * margin) / 2
 
     // Dibujar recuadro para la información
     doc.setDrawColor(...azulOscuro)
-    doc.setLineWidth(0.5)
-    doc.rect(margin, yPos - 5, pageWidth - 2 * margin, campos.length * lineHeight + 10)
+    doc.setLineWidth(0.3)
+    doc.rect(margin, yPos - 2, pageWidth - 2 * margin, 16)
 
-    campos.forEach((campo, index) => {
-      doc.setFont("helvetica", "bold")
-      doc.setFontSize(10)
-      doc.text(campo.label, margin + 5, yPos)
-
-      doc.setFont("helvetica", "normal")
-      doc.text(campo.valor, margin + labelWidth, yPos)
-
-      yPos += lineHeight
-    })
-
-    // Detalle de cargas pagadas
-    yPos += 15
+    // Primera columna de información
     doc.setFont("helvetica", "bold")
-    doc.setFontSize(12)
+    doc.setFontSize(6)
+
+    // Columna izquierda
+    doc.text("Número:", margin + 2, yPos + 2)
+    doc.setFont("helvetica", "normal")
+    doc.text(datosRecibo.numeroRecibo, margin + 18, yPos + 2)
+
+    doc.setFont("helvetica", "bold")
+    doc.text("Fecha:", margin + 2, yPos + 6)
+    doc.setFont("helvetica", "normal")
+    doc.text(datosRecibo.fechaHora, margin + 18, yPos + 6)
+
+    doc.setFont("helvetica", "bold")
+    doc.text("Cliente:", margin + 2, yPos + 10)
+    doc.setFont("helvetica", "normal")
+    // Truncar el nombre del cliente si es muy largo
+    const clienteText =
+      datosRecibo.cliente.length > 20 ? datosRecibo.cliente.substring(0, 20) + "..." : datosRecibo.cliente
+    doc.text(clienteText, margin + 18, yPos + 10)
+
+    // Columna derecha
+    const col2X = pageWidth / 2 + 2
+
+    doc.setFont("helvetica", "bold")
+    doc.text("Tipo:", col2X, yPos + 2)
+    doc.setFont("helvetica", "normal")
+    doc.text(datosRecibo.tipoCliente, col2X + 16, yPos + 2)
+
+    doc.setFont("helvetica", "bold")
+    doc.text("Cargas:", col2X, yPos + 6)
+    doc.setFont("helvetica", "normal")
+    doc.text(datosRecibo.numeroCargas.toString(), col2X + 16, yPos + 6)
+
+    doc.setFont("helvetica", "bold")
+    doc.text("Total:", col2X, yPos + 10)
+    doc.setFont("helvetica", "normal")
+    doc.text(`Bs ${datosRecibo.montoTotal.toFixed(2)}`, col2X + 16, yPos + 10)
+
+    // Detalle de cargas pagadas en tabla
+    yPos = 58
+    doc.setFont("helvetica", "bold")
+    doc.setFontSize(7)
     doc.text("DETALLE DE CARGAS PAGADAS:", margin, yPos)
 
-    yPos += 10
-    doc.setFont("helvetica", "normal")
-    doc.setFontSize(9)
+    yPos += 5
 
-    datosRecibo.cargasDetalle.forEach((carga, index) => {
+    // Configuración de la tabla
+    const tableWidth = pageWidth - 2 * margin
+    const colWidths = [22, 30, 42, 18] // Fecha, Hora, Usuario, Costo
+    const rowHeight = 7
+
+    // Encabezados de la tabla
+    doc.setFillColor(...grisClaro)
+    doc.rect(margin, yPos, tableWidth, rowHeight, "F")
+
+    doc.setDrawColor(...azulOscuro)
+    doc.setLineWidth(0.3)
+    doc.rect(margin, yPos, tableWidth, rowHeight)
+
+    doc.setFont("helvetica", "bold")
+    doc.setFontSize(5)
+    doc.setTextColor(...negro)
+
+    let xPos = margin + 1
+    doc.text("FECHA", xPos, yPos + 4)
+    xPos += colWidths[0]
+    doc.text("HORA", xPos, yPos + 4)
+    xPos += colWidths[1]
+    doc.text("USUARIO", xPos, yPos + 4)
+    xPos += colWidths[2]
+    doc.text("COSTO", xPos, yPos + 4)
+
+    yPos += rowHeight
+
+    // Filas de datos
+    doc.setFont("helvetica", "normal")
+    doc.setFontSize(5)
+
+    // Limitar el número de cargas mostradas
+    const maxCargasToShow = Math.min(datosRecibo.cargasDetalle.length, 12)
+    const cargasToShow = datosRecibo.cargasDetalle.slice(0, maxCargasToShow)
+
+    cargasToShow.forEach((carga, index) => {
       const fechaCarga = new Date(carga.fechaHora).toLocaleDateString("es-ES", {
-        weekday: "long",
-        year: "numeric",
-        month: "long",
-        day: "numeric",
+        day: "2-digit",
+        month: "2-digit",
+        year: "2-digit",
       })
       const horaCarga = new Date(carga.fechaHora).toLocaleTimeString("es-ES", {
         hour: "2-digit",
         minute: "2-digit",
       })
-      const usuarioCarga = carga.usuario?.nombre || carga.usuario?.username || "N/A"
+      const usuarioCarga = (carga.usuario?.nombre || carga.usuario?.username || "N/A").substring(0, 15)
 
-      doc.text(`${index + 1}. Carga #${carga.id}`, margin + 5, yPos)
-      yPos += 4
-      doc.text(`   Fecha: ${fechaCarga} a las ${horaCarga}`, margin + 5, yPos)
-      yPos += 4
-      doc.text(`   Usuario: ${usuarioCarga}`, margin + 5, yPos)
-      yPos += 4
-      doc.text(`   Costo: Bs ${carga.costo}`, margin + 5, yPos)
-      yPos += 8
+      // Dibujar bordes de la fila
+      doc.setDrawColor(...azulOscuro)
+      doc.setLineWidth(0.2)
+      doc.rect(margin, yPos, tableWidth, rowHeight)
+
+      // Líneas verticales
+      let currentX = margin
+      for (let i = 0; i < colWidths.length - 1; i++) {
+        currentX += colWidths[i]
+        doc.line(currentX, yPos, currentX, yPos + rowHeight)
+      }
+
+      // Contenido de la fila
+      xPos = margin + 1
+      doc.text(fechaCarga, xPos, yPos + 4)
+      xPos += colWidths[0]
+      doc.text(horaCarga, xPos, yPos + 4)
+      xPos += colWidths[1]
+      doc.text(usuarioCarga, xPos, yPos + 4)
+      xPos += colWidths[2]
+      doc.text(`Bs ${carga.costo}`, xPos, yPos + 4)
+
+      yPos += rowHeight
     })
 
+    // Si hay más cargas de las que se muestran, indicarlo
+    if (datosRecibo.cargasDetalle.length > maxCargasToShow) {
+      yPos += 2
+      doc.setFont("helvetica", "italic")
+      doc.setFontSize(4)
+      doc.text(`... y ${datosRecibo.cargasDetalle.length - maxCargasToShow} cargas más`, margin, yPos)
+      yPos += 3
+    }
+
     // Pie del recibo
-    yPos += 20
+    yPos += 5
     doc.setDrawColor(...azulOscuro)
     doc.line(margin, yPos, pageWidth - margin, yPos)
 
-    yPos += 10
+    yPos += 4
     doc.setFont("helvetica", "italic")
-    doc.setFontSize(8)
+    doc.setFontSize(4)
     doc.text("Este comprobante es válido como constancia de pago.", pageWidth / 2, yPos, { align: "center" })
-    doc.text("Distribuidora de Agua Los Pinos - Sistema de Gestión", pageWidth / 2, yPos + 5, { align: "center" })
-    doc.text(`Generado el ${new Date().toLocaleString()}`, pageWidth / 2, yPos + 10, { align: "center" })
+    doc.text("Distribuidora de Agua Los Pinos", pageWidth / 2, yPos + 3, { align: "center" })
+    doc.text(`Generado: ${new Date().toLocaleString()}`, pageWidth / 2, yPos + 6, { align: "center" })
 
     // Guardar PDF
     doc.save(`recibo_${datosRecibo.numeroRecibo}.pdf`)
@@ -573,7 +653,7 @@ export default function UsuarioDetalles() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 mt-16">
+    <div className="container mx-auto px-4 py-8 mt-16 max-w-5xl">
       <h1 className="text-2xl font-bold mb-6">Pago por usuario</h1>
 
       <>
@@ -585,56 +665,56 @@ export default function UsuarioDetalles() {
             </Button>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col md:flex-row gap-6">
-              <div className="md:w-1/2">
-                <div className="flex items-start gap-4">
-                  <Avatar className="h-24 w-24">
-                    <AvatarImage src="/placeholder.svg?height=96&width=96" alt={usuarioSeleccionado?.nombre} />
-                    <AvatarFallback className="text-2xl bg-gray-100">
+            <div className="flex flex-col lg:flex-row gap-4">
+              <div className="lg:w-1/2">
+                <div className="flex items-start gap-3">
+                  <Avatar className="h-20 w-20">
+                    <AvatarImage src="/placeholder.svg?height=80&width=80" alt={usuarioSeleccionado?.nombre} />
+                    <AvatarFallback className="text-xl bg-gray-100">
                       {getInitials(usuarioSeleccionado?.nombre)}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1">
-                    <div className="mb-4">
+                    <div className="mb-3">
                       <h3 className="text-sm font-medium text-gray-500">Nombre</h3>
-                      <p className="text-lg">{usuarioSeleccionado?.nombre}</p>
+                      <p className="text-base">{usuarioSeleccionado?.nombre}</p>
                     </div>
-                    <div className="mb-4">
+                    <div className="mb-3">
                       <h3 className="text-sm font-medium text-gray-500">Correo</h3>
-                      <p className="text-lg">{usuarioSeleccionado?.correo || "No disponible"}</p>
+                      <p className="text-base">{usuarioSeleccionado?.correo || "No disponible"}</p>
                     </div>
-                    <div className="mb-4">
+                    <div className="mb-3">
                       <h3 className="text-sm font-medium text-gray-500">CI</h3>
-                      <p className="text-lg">{usuarioSeleccionado?.ci || "No disponible"}</p>
+                      <p className="text-base">{usuarioSeleccionado?.ci || "No disponible"}</p>
                     </div>
                     <Badge className="mt-1">{usuarioSeleccionado?.rol}</Badge>
                   </div>
                 </div>
               </div>
 
-              <div className="md:w-1/2">
-                <div className="grid grid-cols-1 gap-4">
-                  <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-200">
+              <div className="lg:w-1/2">
+                <div className="grid grid-cols-1 gap-3">
+                  <div className="bg-white p-3 rounded-lg shadow-sm border-2 border-gray-200">
                     <h4 className="text-sm font-medium text-gray-500">Total de Cargas</h4>
                     <div className="flex items-center mt-2">
                       <Calendar className="h-5 w-5 mr-2 text-gray-900" />
-                      <span className="text-2xl font-bold">{totalCargas}</span>
+                      <span className="text-xl font-bold">{totalCargas}</span>
                     </div>
                   </div>
 
-                  <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-200">
+                  <div className="bg-white p-3 rounded-lg shadow-sm border-2 border-gray-200">
                     <h4 className="text-sm font-medium text-gray-500">Cargas con Deuda</h4>
                     <div className="flex items-center mt-2">
                       <CreditCard className="h-5 w-5 mr-2 text-amber-600" />
-                      <span className="text-2xl font-bold">{cargasDeuda.length}</span>
+                      <span className="text-xl font-bold">{cargasDeuda.length}</span>
                     </div>
                   </div>
 
-                  <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-200">
+                  <div className="bg-white p-3 rounded-lg shadow-sm border-2 border-gray-200">
                     <h4 className="text-sm font-medium text-gray-500">Total Deuda</h4>
                     <div className="flex items-center mt-2">
                       <DollarSign className="h-5 w-5 mr-2 text-red-600" />
-                      <span className="text-2xl font-bold">Bs{totalDeuda}</span>
+                      <span className="text-xl font-bold">Bs{totalDeuda}</span>
                     </div>
                     <Button
                       className="w-full mt-3 bg-gray-900 hover:bg-gray-800 text-white"
@@ -696,28 +776,28 @@ export default function UsuarioDetalles() {
                     <CardTitle className="text-lg">Resumen de Cargas - {conductorSeleccionado.nombre}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-200">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="bg-white p-3 rounded-lg shadow-sm border-2 border-gray-200">
                         <h4 className="text-sm font-medium text-gray-500">Total de Cargas</h4>
                         <div className="flex items-center mt-2">
                           <Calendar className="h-5 w-5 mr-2 text-gray-900" />
-                          <span className="text-2xl font-bold">{totalCargas}</span>
+                          <span className="text-xl font-bold">{totalCargas}</span>
                         </div>
                       </div>
 
-                      <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-200">
+                      <div className="bg-white p-3 rounded-lg shadow-sm border-2 border-gray-200">
                         <h4 className="text-sm font-medium text-gray-500">Cargas con Deuda</h4>
                         <div className="flex items-center mt-2">
                           <CreditCard className="h-5 w-5 mr-2 text-amber-600" />
-                          <span className="text-2xl font-bold">{cargasDeuda.length}</span>
+                          <span className="text-xl font-bold">{cargasDeuda.length}</span>
                         </div>
                       </div>
 
-                      <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-200">
+                      <div className="bg-white p-3 rounded-lg shadow-sm border-2 border-gray-200">
                         <h4 className="text-sm font-medium text-gray-500">Total Deuda</h4>
                         <div className="flex items-center mt-2">
                           <DollarSign className="h-5 w-5 mr-2 text-red-600" />
-                          <span className="text-2xl font-bold">Bs{totalDeuda}</span>
+                          <span className="text-xl font-bold">Bs{totalDeuda}</span>
                         </div>
                         <Button
                           className="w-full mt-3 bg-gray-900 hover:bg-gray-800 text-white"
@@ -766,10 +846,14 @@ export default function UsuarioDetalles() {
                   >
                     <CardContent className="p-4">
                       <p>
-                        <strong>ID:</strong> {carga.id}
-                      </p>
-                      <p>
-                        <strong>Fecha:</strong> {new Date(carga.fechaHora).toLocaleString()}
+                        <strong>Fecha y Hora:</strong>{" "}
+                        {new Date(carga.fechaHora).toLocaleDateString("es-ES", {
+                          weekday: "long",
+                          day: "numeric",
+                          month: "long",
+                          year: "numeric",
+                        })}{" "}
+                        {new Date(carga.fechaHora).toLocaleTimeString("es-ES")}
                       </p>
                       <p>
                         <strong>Estado:</strong>{" "}
@@ -834,7 +918,6 @@ export default function UsuarioDetalles() {
                 <Table className="w-full border-collapse">
                   <TableHeader className="bg-gray-700">
                     <TableRow className="border-b-0">
-                      <TableHead className="font-bold text-white py-4 border-0">ID</TableHead>
                       <TableHead className="font-bold text-white py-4 border-0">Fecha y Hora</TableHead>
                       <TableHead className="font-bold text-white py-4 border-0">Estado</TableHead>
                       <TableHead className="font-bold text-white py-4 border-0">Costo</TableHead>
@@ -845,8 +928,15 @@ export default function UsuarioDetalles() {
                   <TableBody>
                     {paginatedCargas.map((carga) => (
                       <TableRow key={carga.id} className="border-0 hover:bg-gray-50">
-                        <TableCell className="border-0 py-3">{carga.id}</TableCell>
-                        <TableCell className="border-0 py-3">{new Date(carga.fechaHora).toLocaleString()}</TableCell>
+                        <TableCell className="border-0 py-3">
+                          {new Date(carga.fechaHora).toLocaleDateString("es-ES", {
+                            weekday: "long",
+                            day: "numeric",
+                            month: "long",
+                            year: "numeric",
+                          })}{" "}
+                          {new Date(carga.fechaHora).toLocaleTimeString("es-ES")}
+                        </TableCell>
                         <TableCell className="border-0 py-3">
                           <Badge className={carga.estado === "deuda" ? "bg-red-500" : "bg-green-500"}>
                             {carga.estado}

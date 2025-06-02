@@ -133,7 +133,7 @@ export default function ReportesPage() {
         config.body = JSON.stringify(body)
       }
 
-      const response = await fetch(`${API_URL}/reportes/${endpoint}`, config)
+      const response = await fetch(`${API_URL}/${endpoint}`, config)
 
       if (!response.ok) {
         throw new Error("Error al generar el reporte")

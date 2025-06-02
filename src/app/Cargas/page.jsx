@@ -1,8 +1,25 @@
 "use client"
 
+import React from "react"
+
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { ChevronLeft, ChevronRight, Pencil, Trash2, Plus, Filter, Eye } from "lucide-react"
+import {
+  ChevronLeft,
+  ChevronRight,
+  Pencil,
+  Trash2,
+  Plus,
+  Filter,
+  Eye,
+  Truck,
+  User,
+  Calendar,
+  DollarSign,
+  Clock,
+  CheckCircle,
+  AlertCircle,
+} from "lucide-react"
 
 import { Button } from "../../components/components/ui/button"
 import { Input } from "../../components/components/ui/input"
@@ -16,8 +33,11 @@ import {
   DialogTitle,
 } from "../../components/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/components/ui/select"
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "../../components/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "../../components/components/ui/card"
 import { Checkbox } from "../../components/components/ui/checkbox"
+import { Badge } from "../../components/components/ui/badge"
+import { Avatar, AvatarFallback } from "../../components/components/ui/avatar"  
+import { Separator } from "../../components/components/ui/separator"
 
 const useWindowWidth = () => {
   const [windowWidth, setWindowWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 0)
@@ -31,8 +51,7 @@ const useWindowWidth = () => {
   return windowWidth
 }
 
-
-export default function Page() {
+export default function WaterChargesManagement() {
   const windowWidth = useWindowWidth()
   const isMobile = windowWidth < 768
   const router = useRouter()
@@ -41,6 +60,7 @@ export default function Page() {
   const [showModal, setShowModal] = useState(false)
   const [selectedCharge, setSelectedCharge] = useState(null)
   const [editMode, setEditMode] = useState(false)
+  const [viewMode, setViewMode] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(6)
@@ -54,7 +74,7 @@ export default function Page() {
   const [selectedStatus, setSelectedStatus] = useState([])
   const [truckTypes, setTruckTypes] = useState([])
   const [users, setUsers] = useState([])
-  const [currentPrice, setCurrentPrice] = useState(30) // Default fallback
+  const [currentPrice, setCurrentPrice] = useState(30)
 
   const fetchCurrentPrice = async () => {
     try {
@@ -63,7 +83,6 @@ export default function Page() {
       })
       if (response.ok) {
         const data = await response.json()
-        // Find the active price (should be the first one since they're ordered by creation date DESC)
         const activePrice = data.find((price) => price.activo === true)
         if (activePrice) {
           setCurrentPrice(activePrice.valor)
@@ -71,7 +90,6 @@ export default function Page() {
       }
     } catch (error) {
       console.error("Error fetching current price:", error)
-      // Keep default value of 30 if fetch fails
     }
   }
 
@@ -83,7 +101,7 @@ export default function Page() {
       fetchWaterCharges()
       fetchTruckTypes()
       fetchUsers()
-      fetchCurrentPrice() // Add this line
+      fetchCurrentPrice()
     }
   }, [router])
 
@@ -143,6 +161,7 @@ export default function Page() {
         setSelectedCharge(data)
         setShowModal(true)
         setEditMode(false)
+        setViewMode(true)
       }
     } catch (error) {
       console.error("Error fetching charge details:", error)
@@ -153,12 +172,14 @@ export default function Page() {
     setSelectedCharge(charge)
     setShowModal(true)
     setEditMode(true)
+    setViewMode(false)
   }
 
   const handleCreateCharge = () => {
     setSelectedCharge(null)
     setShowModal(true)
     setEditMode(false)
+    setViewMode(false)
   }
 
   const handleSaveCharge = async (e) => {
@@ -170,7 +191,7 @@ export default function Page() {
           estado: "deuda",
           usuarioId: Number.parseInt(e.target.usuarioId.value),
           tipoCamionId: Number.parseInt(e.target.tipoCamionId.value),
-          costo: currentPrice, // Always use current price, don't read from form
+          costo: currentPrice,
         }
 
     try {
@@ -212,15 +233,34 @@ export default function Page() {
     }
   }
 
+  const getUserInitials = (nombre) => {
+    return (
+      nombre
+        ?.split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2) || "??"
+    )
+  }
+
+  const getStatusBadgeColor = (estado) => {
+    return estado === "pagado"
+      ? "bg-green-100 text-green-800 border-green-200"
+      : "bg-red-100 text-red-800 border-red-200"
+  }
+
+  const getStatusIcon = (estado) => {
+    return estado === "pagado" ? CheckCircle : AlertCircle
+  }
+
   const filteredCharges = waterCharges.filter((charge) => {
-    // Si no hay fechas seleccionadas, mostrar todos los registros
     if (!filterStartDate && !filterEndDate) return true
 
     const chargeDate = new Date(charge.fechaHora)
     const startDate = filterStartDate ? new Date(filterStartDate) : new Date(0)
     const endDate = filterEndDate ? new Date(filterEndDate) : new Date(8640000000000000)
 
-    // Ajustar endDate al final del día
     if (filterEndDate) {
       endDate.setHours(23, 59, 59, 999)
     }
@@ -332,9 +372,13 @@ export default function Page() {
                 {currentCharges.map((charge) => (
                   <TableRow key={charge.id}>
                     <TableCell>{new Date(charge.fechaHora).toLocaleString()}</TableCell>
-                    <TableCell>{charge.estado}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={getStatusBadgeColor(charge.estado)}>
+                        {charge.estado}
+                      </Badge>
+                    </TableCell>
                     <TableCell>{charge.usuario?.nombre || "N/A"}</TableCell>
-                    <TableCell>{charge.costo || currentPrice}</TableCell>
+                    <TableCell>Bs {charge.costo || currentPrice}</TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
                         <Button
@@ -389,35 +433,241 @@ export default function Page() {
         </Button>
       </div>
 
+      {/* Enhanced View Modal */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
-              {editMode ? "Editar Carga de Agua" : selectedCharge ? "Detalles de Carga de Agua" : "Crear Carga de Agua"}
+            <DialogTitle className="text-xl flex items-center gap-2">
+              {viewMode ? (
+                <>
+                  <Eye className="h-5 w-5 text-blue-600" />
+                  Detalles de Carga de Agua
+                </>
+              ) : editMode ? (
+                <>
+                  <Pencil className="h-5 w-5 text-amber-600" />
+                  Editar Carga de Agua
+                </>
+              ) : (
+                <>
+                  <Plus className="h-5 w-5 text-green-600" />
+                  Crear Carga de Agua
+                </>
+              )}
             </DialogTitle>
           </DialogHeader>
-          {selectedCharge && !editMode ? (
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <span className="font-medium">Fecha y Hora:</span>
-                <span className="col-span-3">{new Date(selectedCharge.fechaHora).toLocaleString()}</span>
+
+          {viewMode && selectedCharge ? (
+            <div className="space-y-6">
+              {/* Charge Header */}
+              <div className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg">
+                <div className="flex items-center space-x-4">
+                  <div className="p-3 bg-blue-100 rounded-full">
+                    <Truck className="h-8 w-8 text-blue-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">Carga #{selectedCharge.id}</h3>
+                    <p className="text-gray-600">
+                      {new Date(selectedCharge.fechaHora).toLocaleDateString("es-ES", {
+                        weekday: "long",
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                      })}
+                    </p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <Badge variant="outline" className={getStatusBadgeColor(selectedCharge.estado)}>
+                        {React.createElement(getStatusIcon(selectedCharge.estado), { className: "h-3 w-3 mr-1" })}
+                        {selectedCharge.estado}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-3xl font-bold text-green-600">Bs {selectedCharge.costo || currentPrice}</div>
+                  <div className="text-sm text-gray-500">Costo total</div>
+                </div>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <span className="font-medium">Estado:</span>
-                <span className="col-span-3">{selectedCharge.estado}</span>
+
+              {/* Charge Information Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Date and Time Information */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      Información de Fecha y Hora
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Fecha:</span>
+                      <span className="text-sm font-medium">
+                        {new Date(selectedCharge.fechaHora).toLocaleDateString("es-ES")}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Hora:</span>
+                      <span className="text-sm font-medium">
+                        {new Date(selectedCharge.fechaHora).toLocaleTimeString("es-ES", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Día de la semana:</span>
+                      <span className="text-sm font-medium">
+                        {new Date(selectedCharge.fechaHora).toLocaleDateString("es-ES", {
+                          weekday: "long",
+                        })}
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* User Information */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <User className="h-4 w-4" />
+                      Información del Usuario
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {selectedCharge.usuario ? (
+                      <>
+                        <div className="flex items-center space-x-3">
+                          <Avatar className="h-10 w-10">
+                            <AvatarFallback className="text-sm">
+                              {getUserInitials(selectedCharge.usuario.nombre)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <div className="font-medium">{selectedCharge.usuario.nombre}</div>
+                            <div className="text-sm text-gray-500">@{selectedCharge.usuario.username}</div>
+                          </div>
+                        </div>
+                        <Separator />
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-600">Nombre:</span>
+                            <span className="text-sm font-medium">{selectedCharge.usuario.nombre}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-600">Usuario:</span>
+                            <span className="text-sm font-medium">@{selectedCharge.usuario.username}</span>
+                          </div>
+                          {selectedCharge.usuario.correo && (
+                            <div className="flex justify-between">
+                              <span className="text-sm text-gray-600">Correo:</span>
+                              <span className="text-sm font-medium">{selectedCharge.usuario.correo}</span>
+                            </div>
+                          )}
+                          {selectedCharge.usuario.rol && (
+                            <div className="flex justify-between">
+                              <span className="text-sm text-gray-600">Rol:</span>
+                              <Badge variant="outline" className="text-xs">
+                                {selectedCharge.usuario.rol}
+                              </Badge>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-center py-4 text-gray-500">
+                        <User className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                        <p>No hay información del usuario disponible</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Truck Information */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <Truck className="h-4 w-4" />
+                      Información del Camión
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {selectedCharge.tiposDeCamion ? (
+                      <>
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-600">Tipo de camión:</span>
+                          <span className="text-sm font-medium">{selectedCharge.tiposDeCamion.descripcion}</span>
+                        </div>
+                        {selectedCharge.tiposDeCamion.capacidad && (
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-600">Capacidad:</span>
+                            <span className="text-sm font-medium">{selectedCharge.tiposDeCamion.capacidad} L</span>
+                          </div>
+                        )}
+                        {selectedCharge.tiposDeCamion.marca && (
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-600">Marca:</span>
+                            <span className="text-sm font-medium">{selectedCharge.tiposDeCamion.marca}</span>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="text-center py-4 text-gray-500">
+                        <Truck className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                        <p>No hay información del camión disponible</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Payment Information */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <DollarSign className="h-4 w-4" />
+                      Información de Pago
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Estado:</span>
+                      <Badge variant="outline" className={getStatusBadgeColor(selectedCharge.estado)}>
+                        {React.createElement(getStatusIcon(selectedCharge.estado), { className: "h-3 w-3 mr-1" })}
+                        {selectedCharge.estado}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Costo:</span>
+                      <span className="text-lg font-bold text-green-600">
+                        Bs {selectedCharge.costo || currentPrice}
+                      </span>
+                    </div>
+                    {selectedCharge.fechaPago && (
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Fecha de pago:</span>
+                        <span className="text-sm font-medium">
+                          {new Date(selectedCharge.fechaPago).toLocaleDateString("es-ES")}
+                        </span>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <span className="font-medium">Usuario:</span>
-                <span className="col-span-3">{selectedCharge.usuario?.username || "N/A"}</span>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <span className="font-medium">Tipo de Camión:</span>
-                <span className="col-span-3">{selectedCharge.tiposDeCamion?.descripcion || "N/A"}</span>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <span className="font-medium">Costo:</span>
-                <span className="col-span-3">{selectedCharge.costo || currentPrice}</span>
-              </div>
+
+              {/* Additional Information */}
+              {selectedCharge.observaciones && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      Observaciones
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-gray-700 bg-gray-50 p-3 rounded-lg">{selectedCharge.observaciones}</p>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           ) : (
             <form onSubmit={handleSaveCharge}>
@@ -490,7 +740,24 @@ export default function Page() {
                 </div>
               </div>
               <DialogFooter>
-                <Button type="submit">{editMode ? "Guardar Cambios" : "Crear Carga de Agua"}</Button>
+                {viewMode ? (
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setViewMode(false)
+                        setEditMode(true)
+                      }}
+                      className="flex items-center gap-2"
+                    >
+                      <Pencil className="h-4 w-4" />
+                      Editar
+                    </Button>
+                    <Button onClick={() => setShowModal(false)}>Cerrar</Button>
+                  </div>
+                ) : (
+                  <Button type="submit">{editMode ? "Guardar Cambios" : "Crear Carga de Agua"}</Button>
+                )}
               </DialogFooter>
             </form>
           )}

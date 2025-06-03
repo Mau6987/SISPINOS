@@ -150,7 +150,7 @@ export default function UserManagementEnhanced() {
 
   const fetchData = async () => {
     try {
-      const response = await fetch("https://mi-backendsecond.onrender.com/usuarios", {
+      const response = await fetch("https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/usuarios", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
 
@@ -220,7 +220,7 @@ export default function UserManagementEnhanced() {
 
   const fetchPropietarios = async () => {
     try {
-      const response = await fetch("https://mi-backendsecond.onrender.com/propietarios", {
+      const response = await fetch("https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/propietarios", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
       if (response.ok) {
@@ -344,8 +344,8 @@ export default function UserManagementEnhanced() {
 
     try {
       const url = editMode
-        ? `https://mi-backendsecond.onrender.com/usuarios/${selectedUser.id}`
-        : "https://mi-backendsecond.onrender.com/usuarios"
+        ? `https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/${selectedUser.id}`
+        : "https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev"
 
       if (!navigator.onLine) {
         // Registrar para sincronización en segundo plano
@@ -427,7 +427,7 @@ export default function UserManagementEnhanced() {
     try {
       if (!navigator.onLine) {
         // Registrar para sincronización en segundo plano
-        await registerSyncRequest(`https://mi-backendsecond.onrender.com/usuarios/${selectedUser.id}`, "DELETE", {})
+        await registerSyncRequest(`https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/usuarios/${selectedUser.id}`, "DELETE", {})
         updatePendingSyncCount(true)
         setUsers((prevUsers) => prevUsers.filter((user) => user.id !== selectedUser.id))
 
@@ -439,7 +439,7 @@ export default function UserManagementEnhanced() {
         return
       }
 
-      const response = await fetch(`https://mi-backendsecond.onrender.com/usuarios/${selectedUser.id}`, {
+      const response = await fetch(`https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/${selectedUser.id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })

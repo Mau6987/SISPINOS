@@ -28,7 +28,7 @@ import { Input } from "@/components/components/ui/input"
 import { Label } from "@/components/components/ui/label"
 import jsPDF from "jspdf"
 // URL de la API
-const API_URL = "https://mi-backendsecond.onrender.com"
+const API_URL = "https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev"
 
 export default function DashboardPage() {
   const router = useRouter()

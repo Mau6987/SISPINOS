@@ -118,7 +118,7 @@ export default function UsuarioDetalles() {
 
   const fetchUsuarios = async () => {
     try {
-      const response = await fetch("https://mi-backendsecond.onrender.com/usuarios", {
+      const response = await fetch("https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/usuarios", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
       if (response.ok) {
@@ -133,7 +133,7 @@ export default function UsuarioDetalles() {
 
   const fetchConductores = async (propietarioId) => {
     try {
-      const response = await fetch("https://mi-backendsecond.onrender.com/usuarios", {
+      const response = await fetch("https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/usuarios", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
       if (response.ok) {
@@ -155,10 +155,10 @@ export default function UsuarioDetalles() {
       if (esPropio) {
         endpoint =
           usuarioSeleccionado?.rol === "propietario"
-            ? `https://mi-backendsecond.onrender.com/cargasPropietario/${usuarioId}`
-            : `https://mi-backendsecond.onrender.com/cargascliente/${usuarioId}`
+            ? `https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/cargasPropietario/${usuarioId}`
+            : `https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/cargascliente/${usuarioId}`
       } else {
-        endpoint = `https://mi-backendsecond.onrender.com/cargascliente/${usuarioId}`
+        endpoint = `https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/cargascliente/${usuarioId}`
       }
 
       const response = await fetch(endpoint, {
@@ -198,7 +198,7 @@ export default function UsuarioDetalles() {
   const fetchTodasLasCargas = async (propietarioId) => {
     try {
       const responsePropietario = await fetch(
-        `https://mi-backendsecond.onrender.com/cargasPropietario/${propietarioId}`,
+        `https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/cargasPropietario/${propietarioId}`,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         },
@@ -216,7 +216,7 @@ export default function UsuarioDetalles() {
         })
       }
 
-      const responseConductores = await fetch("https://mi-backendsecond.onrender.com/usuarios", {
+      const responseConductores = await fetch("https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/usuarios", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
 
@@ -227,7 +227,7 @@ export default function UsuarioDetalles() {
         )
 
         for (const conductor of conductoresFiltrados) {
-          const responseConductor = await fetch(`https://mi-backendsecond.onrender.com/cargascliente/${conductor.id}`, {
+          const responseConductor = await fetch(`https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/cargascliente/${conductor.id}`, {
             headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
           })
 
@@ -537,7 +537,7 @@ export default function UsuarioDetalles() {
     }
 
     try {
-      const response = await fetch("https://mi-backendsecond.onrender.com/pagoscargagua", {
+      const response = await fetch("https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/pagoscargagua", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -639,7 +639,7 @@ export default function UsuarioDetalles() {
 
   const fetchChargeDetails = async (chargeId) => {
     try {
-      const response = await fetch(`https://mi-backendsecond.onrender.com/cargagua/${chargeId}`, {
+      const response = await fetch(`https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/cargagua/${chargeId}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
       if (response.ok) {

@@ -238,7 +238,7 @@ export default function ClientManagementEnhanced() {
 
   const fetchData = async () => {
     try {
-      const response = await fetch("https://mi-backendsecond.onrender.com/usuarios", {
+      const response = await fetch("https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/usuarios", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
 
@@ -302,7 +302,7 @@ export default function ClientManagementEnhanced() {
 
   const fetchUserById = async (userId) => {
     try {
-      const response = await fetch(`https://mi-backendsecond.onrender.com/usuarios/${userId}`, {
+      const response = await fetch(`https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/usuarios/${userId}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
 
@@ -373,7 +373,7 @@ export default function ClientManagementEnhanced() {
     try {
       if (!navigator.onLine) {
         // Registrar para sincronización en segundo plano
-        await registerSyncRequest(`https://mi-backendsecond.onrender.com/usuarios/${userId}`, "PUT", {
+        await registerSyncRequest(`https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/usuarios/${userId}`, "PUT", {
           numeroTarjetaRFID: cardNumber,
         })
         updatePendingSyncCount(true)
@@ -401,7 +401,7 @@ export default function ClientManagementEnhanced() {
         motivoBloqueo: userData.motivoBloqueo,
       }
 
-      const response = await fetch(`https://mi-backendsecond.onrender.com/usuarios/${userId}`, {
+      const response = await fetch(`https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/usuarios/${userId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -433,8 +433,8 @@ export default function ClientManagementEnhanced() {
       if (!navigator.onLine) {
         // Registrar para sincronización en segundo plano
         const url = blocked
-          ? `https://mi-backendsecond.onrender.com/usuarios/${userId}/bloquear`
-          : `https://mi-backendsecond.onrender.com/usuarios/${userId}/desbloquear`
+          ? `https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/usuarios/${userId}/bloquear`
+          : `https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/usuarios/${userId}/desbloquear`
 
         await registerSyncRequest(url, "POST", blocked ? { motivoBloqueo: reason } : {})
         updatePendingSyncCount(true)
@@ -457,8 +457,8 @@ export default function ClientManagementEnhanced() {
       }
 
       const url = blocked
-        ? `https://mi-backendsecond.onrender.com/usuarios/${userId}/bloquear`
-        : `https://mi-backendsecond.onrender.com/usuarios/${userId}/desbloquear`
+        ? `https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/usuarios/${userId}/bloquear`
+        : `https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/usuarios/${userId}/desbloquear`
 
       const response = await fetch(url, {
         method: "POST",

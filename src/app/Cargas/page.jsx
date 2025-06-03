@@ -78,7 +78,7 @@ export default function WaterChargesManagement() {
 
   const fetchCurrentPrice = async () => {
     try {
-      const response = await fetch("https://mi-backendsecond.onrender.com/precios", {
+      const response = await fetch("https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/precios", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
       if (response.ok) {
@@ -107,7 +107,7 @@ export default function WaterChargesManagement() {
 
   const fetchWaterCharges = async () => {
     try {
-      const response = await fetch("https://mi-backendsecond.onrender.com/cargagua", {
+      const response = await fetch("https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/cargagua", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
       if (response.ok) {
@@ -125,7 +125,7 @@ export default function WaterChargesManagement() {
 
   const fetchTruckTypes = async () => {
     try {
-      const response = await fetch("https://mi-backendsecond.onrender.com/tiposDeCamion", {
+      const response = await fetch("https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/tiposDeCamion", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
       if (response.ok) {
@@ -139,7 +139,7 @@ export default function WaterChargesManagement() {
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch("https://mi-backendsecond.onrender.com/usuariosrol", {
+      const response = await fetch("https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/usuariosrol", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
       if (response.ok) {
@@ -153,7 +153,7 @@ export default function WaterChargesManagement() {
 
   const handleViewCharge = async (charge) => {
     try {
-      const response = await fetch(`https://mi-backendsecond.onrender.com/cargagua/${charge.id}`, {
+      const response = await fetch(`https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/cargagua/${charge.id}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
       if (response.ok) {
@@ -196,8 +196,8 @@ export default function WaterChargesManagement() {
 
     try {
       const url = editMode
-        ? `https://mi-backendsecond.onrender.com/cargagua/${selectedCharge.id}`
-        : "https://mi-backendsecond.onrender.com/cargagua"
+        ? `https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/cargagua/${selectedCharge.id}`
+        : "https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/cargagua"
       const method = editMode ? "PUT" : "POST"
 
       const response = await fetch(url, {
@@ -220,7 +220,7 @@ export default function WaterChargesManagement() {
 
   const handleDeleteCharge = async () => {
     try {
-      const response = await fetch(`https://mi-backendsecond.onrender.com/cargagua/${selectedCharge.id}`, {
+      const response = await fetch(`https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/cargagua/${selectedCharge.id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })

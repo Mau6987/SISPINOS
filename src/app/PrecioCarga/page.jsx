@@ -36,7 +36,7 @@ import { Checkbox } from "@/components/components/ui/checkbox"
 import { Textarea } from "@/components/components/ui/textarea"
 
 // URL de la API
-const API_URL = "https://mi-backendsecond.onrender.com"
+const API_URL = "https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev"
 
 
 export default function PreciosPage() {

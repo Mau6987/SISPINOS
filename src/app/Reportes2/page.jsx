@@ -39,7 +39,7 @@ import { Checkbox } from "@/components/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/components/ui/select"
 
 // URL de la API
-const API_URL = "https://mi-backendsecond.onrender.com"
+const API_URL = "https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev"
 
 
 export default function ReportesPage() {

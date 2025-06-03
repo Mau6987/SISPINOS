@@ -41,7 +41,7 @@ export default function ProfilePage() {
     setProfile((prev) => ({ ...prev, rol: userRole || "" }))
   }, [router])
 
-  const apiUrl = userId ? `https://mi-backendsecond.onrender.com/perfil/${userId}` : ""
+  const apiUrl = userId ? `https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/perfil/${userId}` : ""
 
   useEffect(() => {
     if (userId && token) {

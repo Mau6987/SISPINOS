@@ -77,7 +77,7 @@ export default function PagoCargaAgua() {
 
   const fetchUsuarios = async () => {
     try {
-      const response = await fetch("https://mi-backendsecond.onrender.com/usuariosrol", {
+      const response = await fetch("https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/usuariosrol", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
       if (response.ok) {
@@ -91,7 +91,7 @@ export default function PagoCargaAgua() {
 
   const fetchPagos = async () => {
     try {
-      const response = await fetch("https://mi-backendsecond.onrender.com/pagoscargagua", {
+      const response = await fetch("https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/pagoscargagua", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
       if (response.ok) {
@@ -111,7 +111,7 @@ export default function PagoCargaAgua() {
 
   const handleVerPago = async (pago) => {
     try {
-      const response = await fetch(`https://mi-backendsecond.onrender.com/pagoscargagua/${pago.id}`, {
+      const response = await fetch(`https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/pagoscargagua/${pago.id}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
       if (response.ok) {
@@ -131,7 +131,7 @@ export default function PagoCargaAgua() {
 
   const handleDescargarPDF = async (pago) => {
     try {
-      const response = await fetch(`https://mi-backendsecond.onrender.com/pagoscargagua/${pago.id}`, {
+      const response = await fetch(`https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/pagoscargagua/${pago.id}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
       if (response.ok) {
@@ -361,7 +361,7 @@ export default function PagoCargaAgua() {
     if (!selectedPago) return
 
     try {
-      const response = await fetch(`https://mi-backendsecond.onrender.com/pagoscargagua/${selectedPago.id}`, {
+      const response = await fetch(`https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/pagoscargagua/${selectedPago.id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })

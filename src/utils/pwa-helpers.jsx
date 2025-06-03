@@ -4,28 +4,110 @@
  * Utilidades para trabajar con características de PWA
  */
 
+const DB_NAME = "pwa-app-db"
+const DB_VERSION = 3 // Incrementamos la versión para forzar recreación
+
+let dbInstance = null
+
+/**
+ * Inicializa la base de datos con manejo robusto de errores
+ */
+const initDB = () => {
+  return new Promise((resolve, reject) => {
+    if (dbInstance) {
+      resolve(dbInstance)
+      return
+    }
+
+    const request = indexedDB.open(DB_NAME, DB_VERSION)
+
+    request.onerror = () => {
+      console.error("Error al abrir IndexedDB:", request.error)
+      reject(request.error)
+    }
+
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result
+      console.log("Actualizando estructura de IndexedDB...")
+
+      // Eliminar stores existentes si existen (para recrear)
+      const existingStores = Array.from(db.objectStoreNames)
+      existingStores.forEach((storeName) => {
+        if (db.objectStoreNames.contains(storeName)) {
+          db.deleteObjectStore(storeName)
+          console.log(`Object store '${storeName}' eliminado`)
+        }
+      })
+
+      // Crear object stores necesarios
+      const storeNames = ["users", "propietarios", "syncRequests", "cache"]
+
+      storeNames.forEach((storeName) => {
+        const store = db.createObjectStore(storeName, { keyPath: "id" })
+        console.log(`Object store '${storeName}' creado`)
+
+        // Crear índices específicos para syncRequests
+        if (storeName === "syncRequests") {
+          store.createIndex("timestamp", "timestamp", { unique: false })
+          store.createIndex("attempts", "attempts", { unique: false })
+          store.createIndex("endpoint", "endpoint", { unique: false })
+        }
+
+        // Crear índices para users
+        if (storeName === "users") {
+          store.createIndex("timestamp", "timestamp", { unique: false })
+        }
+
+        // Crear índices para propietarios
+        if (storeName === "propietarios") {
+          store.createIndex("timestamp", "timestamp", { unique: false })
+        }
+      })
+    }
+
+    request.onsuccess = () => {
+      dbInstance = request.result
+      console.log("IndexedDB inicializada correctamente con stores:", Array.from(dbInstance.objectStoreNames))
+      resolve(dbInstance)
+    }
+
+    request.onblocked = () => {
+      console.warn("IndexedDB bloqueada, cerrando conexiones existentes...")
+      if (dbInstance) {
+        dbInstance.close()
+        dbInstance = null
+      }
+    }
+  })
+}
+
+/**
+ * Verifica si un store existe en la base de datos
+ */
+const storeExists = async (storeName) => {
+  try {
+    const db = await initDB()
+    return db.objectStoreNames.contains(storeName)
+  } catch (error) {
+    console.error("Error verificando store:", error)
+    return false
+  }
+}
+
 /**
  * Guarda datos en IndexedDB para uso offline
  */
 export async function saveToIndexedDB(storeName, data, key) {
-  return new Promise((resolve, reject) => {
-    // Abrir o crear la base de datos
-    const request = indexedDB.open("pwa-app-db", 1)
+  try {
+    const db = await initDB()
 
-    request.onerror = () => reject(new Error("Error al abrir IndexedDB"))
-
-    request.onupgradeneeded = (event) => {
-      const db = event.target.result
-
-      // Crear el almacén si no existe
-      if (!db.objectStoreNames.contains(storeName)) {
-        db.createObjectStore(storeName, { keyPath: key || "id" })
-      }
+    // Verificar que el store existe
+    if (!db.objectStoreNames.contains(storeName)) {
+      console.error(`Store '${storeName}' no existe en la base de datos`)
+      return false
     }
 
-    request.onsuccess = (event) => {
-      const db = event.target.result
-
+    return new Promise((resolve, reject) => {
       try {
         const transaction = db.transaction(storeName, "readwrite")
         const store = transaction.objectStore(storeName)
@@ -33,35 +115,44 @@ export async function saveToIndexedDB(storeName, data, key) {
         const addRequest = store.put(data)
 
         addRequest.onsuccess = () => {
+          console.log(`Datos guardados en IndexedDB store: ${storeName}`)
           resolve(true)
         }
 
         addRequest.onerror = () => {
-          reject(new Error("Error al guardar datos en IndexedDB"))
+          console.error(`Error al guardar en store ${storeName}:`, addRequest.error)
+          reject(addRequest.error)
         }
 
-        transaction.oncomplete = () => {
-          db.close()
+        transaction.onerror = () => {
+          console.error(`Error en transacción para store ${storeName}:`, transaction.error)
+          reject(transaction.error)
         }
       } catch (error) {
+        console.error(`Error creando transacción para ${storeName}:`, error)
         reject(error)
       }
-    }
-  })
+    })
+  } catch (error) {
+    console.error(`Error al guardar en IndexedDB (${storeName}):`, error)
+    return false
+  }
 }
 
 /**
  * Recupera datos de IndexedDB
  */
 export async function getFromIndexedDB(storeName, key) {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open("pwa-app-db", 1)
+  try {
+    const db = await initDB()
 
-    request.onerror = () => reject(new Error("Error al abrir IndexedDB"))
+    // Verificar que el store existe
+    if (!db.objectStoreNames.contains(storeName)) {
+      console.error(`Store '${storeName}' no existe en la base de datos`)
+      return null
+    }
 
-    request.onsuccess = (event) => {
-      const db = event.target.result
-
+    return new Promise((resolve, reject) => {
       try {
         const transaction = db.transaction(storeName, "readonly")
         const store = transaction.objectStore(storeName)
@@ -81,31 +172,39 @@ export async function getFromIndexedDB(storeName, key) {
         }
 
         getRequest.onerror = () => {
-          reject(new Error("Error al recuperar datos de IndexedDB"))
+          console.error(`Error al recuperar de store ${storeName}:`, getRequest.error)
+          reject(getRequest.error)
         }
 
-        transaction.oncomplete = () => {
-          db.close()
+        transaction.onerror = () => {
+          console.error(`Error en transacción para store ${storeName}:`, transaction.error)
+          reject(transaction.error)
         }
       } catch (error) {
+        console.error(`Error creando transacción para ${storeName}:`, error)
         reject(error)
       }
-    }
-  })
+    })
+  } catch (error) {
+    console.error(`Error al acceder a IndexedDB (${storeName}):`, error)
+    return null
+  }
 }
 
 /**
  * Elimina datos de IndexedDB
  */
 export async function removeFromIndexedDB(storeName, key) {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open("pwa-app-db", 1)
+  try {
+    const db = await initDB()
 
-    request.onerror = () => reject(new Error("Error al abrir IndexedDB"))
+    // Verificar que el store existe
+    if (!db.objectStoreNames.contains(storeName)) {
+      console.error(`Store '${storeName}' no existe en la base de datos`)
+      return false
+    }
 
-    request.onsuccess = (event) => {
-      const db = event.target.result
-
+    return new Promise((resolve, reject) => {
       try {
         const transaction = db.transaction(storeName, "readwrite")
         const store = transaction.objectStore(storeName)
@@ -113,21 +212,28 @@ export async function removeFromIndexedDB(storeName, key) {
         const deleteRequest = store.delete(key)
 
         deleteRequest.onsuccess = () => {
+          console.log(`Datos eliminados de IndexedDB store: ${storeName}`)
           resolve(true)
         }
 
         deleteRequest.onerror = () => {
-          reject(new Error("Error al eliminar datos de IndexedDB"))
+          console.error(`Error al eliminar de store ${storeName}:`, deleteRequest.error)
+          reject(deleteRequest.error)
         }
 
-        transaction.oncomplete = () => {
-          db.close()
+        transaction.onerror = () => {
+          console.error(`Error en transacción para store ${storeName}:`, transaction.error)
+          reject(transaction.error)
         }
       } catch (error) {
+        console.error(`Error creando transacción para ${storeName}:`, error)
         reject(error)
       }
-    }
-  })
+    })
+  } catch (error) {
+    console.error(`Error al eliminar de IndexedDB (${storeName}):`, error)
+    return false
+  }
 }
 
 /**
@@ -145,30 +251,38 @@ export async function registerSyncRequest(endpoint, method, data) {
       attempts: 0,
     }
 
-    await saveToIndexedDB("syncRequests", syncRequest)
+    const saved = await saveToIndexedDB("syncRequests", syncRequest)
+
+    if (!saved) {
+      console.error("No se pudo guardar la solicitud de sincronización")
+      return false
+    }
 
     // Actualizar contador de solicitudes pendientes
     const pendingCount = localStorage.getItem("pendingRequestsCount")
     const newCount = pendingCount ? Number.parseInt(pendingCount, 10) + 1 : 1
     localStorage.setItem("pendingRequestsCount", newCount.toString())
 
-    // Registrar tarea de sincronización si el navegador lo soporta
-    if ("serviceWorker" in navigator && "SyncManager" in window) {
+    // Intentar registrar Background Sync solo si está disponible y permitido
+    if (await isBackgroundSyncSupported()) {
       try {
         const registration = await navigator.serviceWorker.ready
-
-        // Usar notación de corchetes para evitar errores de TypeScript
-        const syncManager = registration["sync"]
+        const syncManager = registration.sync
 
         if (syncManager) {
-          await syncManager["register"]("sync-requests")
+          await syncManager.register("sync-requests")
+          console.log("Background Sync registrado exitosamente")
         }
       } catch (error) {
-        console.log("No se pudo registrar background sync, pero la solicitud se guardó para sincronización manual")
+        // No es crítico si falla Background Sync, la sincronización manual funcionará
+        console.log("Background Sync no disponible, usando sincronización manual:", error.message)
       }
     }
+
+    return true
   } catch (error) {
     console.error("Error al registrar solicitud para sincronización:", error)
+    return false
   }
 }
 
@@ -203,14 +317,24 @@ export function getPWASupport() {
  */
 export async function processPendingSyncRequests() {
   try {
+    // Verificar que el store existe antes de intentar acceder
+    if (!(await storeExists("syncRequests"))) {
+      console.log("Store syncRequests no existe, inicializando...")
+      await initDB()
+      return { processed: 0, failed: 0 }
+    }
+
     const pendingRequests = await getFromIndexedDB("syncRequests")
 
     if (!pendingRequests || pendingRequests.length === 0) {
+      console.log("No hay solicitudes pendientes para procesar")
       return { processed: 0, failed: 0 }
     }
 
     let processed = 0
     let failed = 0
+
+    console.log(`Procesando ${pendingRequests.length} solicitudes pendientes`)
 
     for (const request of pendingRequests) {
       try {
@@ -227,6 +351,7 @@ export async function processPendingSyncRequests() {
           // Eliminar la solicitud procesada
           await removeFromIndexedDB("syncRequests", request.id)
           processed++
+          console.log(`Solicitud ${request.id} procesada exitosamente`)
         } else {
           // Incrementar intentos fallidos
           request.attempts = (request.attempts || 0) + 1
@@ -235,14 +360,24 @@ export async function processPendingSyncRequests() {
           if (request.attempts >= 3) {
             await removeFromIndexedDB("syncRequests", request.id)
             failed++
+            console.log(`Solicitud ${request.id} eliminada después de 3 intentos fallidos`)
           } else {
             // Actualizar la solicitud con el nuevo número de intentos
             await saveToIndexedDB("syncRequests", request)
+            console.log(`Solicitud ${request.id} falló, reintento ${request.attempts}/3`)
           }
         }
       } catch (error) {
-        console.error("Error al procesar solicitud de sync:", error)
-        failed++
+        console.error(`Error al procesar solicitud ${request.id}:`, error)
+
+        // Incrementar intentos en caso de error de red
+        request.attempts = (request.attempts || 0) + 1
+        if (request.attempts >= 3) {
+          await removeFromIndexedDB("syncRequests", request.id)
+          failed++
+        } else {
+          await saveToIndexedDB("syncRequests", request)
+        }
       }
     }
 
@@ -251,6 +386,7 @@ export async function processPendingSyncRequests() {
     const remainingCount = remainingRequests ? remainingRequests.length : 0
     localStorage.setItem("pendingRequestsCount", remainingCount.toString())
 
+    console.log(`Sincronización completada: ${processed} procesadas, ${failed} fallidas, ${remainingCount} restantes`)
     return { processed, failed }
   } catch (error) {
     console.error("Error al procesar solicitudes pendientes:", error)
@@ -289,21 +425,31 @@ export function setupSyncEventListener() {
  * Inicializa el sistema de sincronización en segundo plano
  */
 export function initializeBackgroundSync() {
-  setupSyncEventListener()
+  // Inicializar la base de datos primero
+  initDB()
+    .then(() => {
+      console.log("Base de datos inicializada para Background Sync")
 
-  // Procesar solicitudes pendientes cuando la app se carga
-  if (navigator.onLine) {
-    processPendingSyncRequests()
-  }
+      setupSyncEventListener()
 
-  // Procesar solicitudes cuando vuelve la conexión
-  window.addEventListener("online", () => {
-    processPendingSyncRequests()
-  })
+      // Procesar solicitudes pendientes cuando la app se carga
+      if (navigator.onLine) {
+        processPendingSyncRequests()
+      }
+
+      // Procesar solicitudes cuando vuelve la conexión
+      window.addEventListener("online", () => {
+        console.log("Conexión restaurada, procesando solicitudes pendientes...")
+        processPendingSyncRequests()
+      })
+    })
+    .catch((error) => {
+      console.error("Error inicializando Background Sync:", error)
+    })
 }
 
 /**
- * Verifica si Background Sync está disponible
+ * Verifica si Background Sync está disponible y permitido
  */
 export async function isBackgroundSyncSupported() {
   if (!("serviceWorker" in navigator) || !("SyncManager" in window)) {
@@ -312,9 +458,52 @@ export async function isBackgroundSyncSupported() {
 
   try {
     const registration = await navigator.serviceWorker.ready
-    // Usar notación de corchetes para evitar errores de TypeScript
-    return !!registration["sync"]
+    return !!registration.sync
   } catch (error) {
+    console.log("Background Sync no está disponible:", error.message)
     return false
   }
 }
+
+/**
+ * Función para limpiar la base de datos
+ */
+export async function clearIndexedDB() {
+  try {
+    const db = await initDB()
+    const storeNames = ["users", "propietarios", "syncRequests", "cache"]
+
+    return new Promise((resolve, reject) => {
+      try {
+        const transaction = db.transaction(storeNames, "readwrite")
+
+        storeNames.forEach((storeName) => {
+          if (db.objectStoreNames.contains(storeName)) {
+            const store = transaction.objectStore(storeName)
+            store.clear()
+            console.log(`Store ${storeName} limpiado`)
+          }
+        })
+
+        transaction.oncomplete = () => {
+          console.log("IndexedDB limpiada correctamente")
+          resolve(true)
+        }
+
+        transaction.onerror = () => {
+          console.error("Error al limpiar IndexedDB:", transaction.error)
+          reject(transaction.error)
+        }
+      } catch (error) {
+        console.error("Error creando transacción para limpiar:", error)
+        reject(error)
+      }
+    })
+  } catch (error) {
+    console.error("Error al limpiar IndexedDB:", error)
+    return false
+  }
+}
+
+// Función de compatibilidad para mantener la API anterior
+export const processPendingRequests = processPendingSyncRequests

@@ -21,14 +21,7 @@ import { Button } from "@/components/components/ui/button"
 import { Input } from "@/components/components/ui/input"
 import { Label } from "@/components/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/components/ui/table"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle,  DialogFooter } from "@/components/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/components/ui/select"
 import { Checkbox } from "@/components/components/ui/checkbox"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/components/ui/card"
@@ -39,14 +32,20 @@ import { toast } from "@/components/hooks/use-toast"
 
 // Importar componentes PWA
 import OfflineIndicator from "@/components/pwa-features/offline-indicator"
-import SyncManager from "@/components/pwa-features/sync-manager"
 import NetworkStatusHandler from "@/components/pwa-features/network-status-handler"
 import InstallPrompt from "@/components/pwa-features/install-prompt"
 import CacheIndicator from "@/components/pwa-features/cache-indicator"
 import ResponsiveContainer from "@/components/responsive-container"
 import { usePWAFeatures } from "../../hooks/use-pwa-features"
-import { saveToIndexedDB, getFromIndexedDB, registerSyncRequest } from "../../utils/pwa-helpers"
-import BackgroundSync from "@/components/pwa-features/background-sync"
+import {
+  saveToIndexedDB,
+  getFromIndexedDB,
+  registerSyncRequest,
+  initializeBackgroundSync,
+} from "../../utils/pwa-helpers"
+import BackgroundSyncEnhanced from "@/components/pwa-features/background-sync"
+import SyncManagerEnhanced from "@/components/pwa-features/sync-manager"
+
 
 export default function UserManagementEnhanced() {
   const [users, setUsers] = useState([])
@@ -143,6 +142,9 @@ export default function UserManagementEnhanced() {
     if (role !== "admin") {
       router.push("/")
     } else {
+      // Inicializar background sync
+      initializeBackgroundSync()
+
       fetchData()
       fetchPropietarios()
     }
@@ -344,8 +346,8 @@ export default function UserManagementEnhanced() {
 
     try {
       const url = editMode
-        ? `https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/${selectedUser.id}`
-        : "https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev"
+        ? `https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/usuarios/${selectedUser.id}`
+        : "https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/usuarios"
 
       if (!navigator.onLine) {
         // Registrar para sincronización en segundo plano
@@ -427,7 +429,11 @@ export default function UserManagementEnhanced() {
     try {
       if (!navigator.onLine) {
         // Registrar para sincronización en segundo plano
-        await registerSyncRequest(`https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/usuarios/${selectedUser.id}`, "DELETE", {})
+        await registerSyncRequest(
+          `https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/usuarios/${selectedUser.id}`,
+          "DELETE",
+          {},
+        )
         updatePendingSyncCount(true)
         setUsers((prevUsers) => prevUsers.filter((user) => user.id !== selectedUser.id))
 
@@ -439,10 +445,13 @@ export default function UserManagementEnhanced() {
         return
       }
 
-      const response = await fetch(`https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/${selectedUser.id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      })
+      const response = await fetch(
+        `https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/usuarios/${selectedUser.id}`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        },
+      )
 
       if (response.ok) {
         fetchData()
@@ -503,9 +512,13 @@ export default function UserManagementEnhanced() {
         </div>
 
         <InstallPrompt />
-        <SyncManager onSync={fetchData} />
+        <SyncManagerEnhanced onSync={fetchData} />
         <CacheIndicator />
-        <BackgroundSync syncTag="user-sync" onSyncRegistered={() => console.log("Sync registrado para usuarios")} />
+        <BackgroundSyncEnhanced
+          syncTag="user-sync"
+          onSyncRegistered={() => console.log("Sync registrado para usuarios")}
+          onSyncError={(error) => console.error("Error en Background Sync:", error)}
+        />
 
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
           <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 flex-1 w-full sm:w-auto">
@@ -671,14 +684,14 @@ export default function UserManagementEnhanced() {
         </div>
 
         <Dialog open={showModal} onOpenChange={setShowModal}>
-          <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto" aria-describedby="dialog-description">
+          <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto" aria-describedby="user-dialog-description">
             <DialogHeader>
               <DialogTitle className="text-lg">
                 {editMode ? "Editar Usuario" : viewMode ? "Detalles del Usuario" : "Crear Usuario"}
               </DialogTitle>
             </DialogHeader>
             {viewMode ? (
-              <div className="space-y-6" id="dialog-description">
+              <div className="space-y-6" id="user-dialog-description">
                 {/* Header with user avatar and basic info */}
                 <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg border border-blue-200">
                   <div className="flex items-center space-x-4">
@@ -870,7 +883,7 @@ export default function UserManagementEnhanced() {
                 )}
               </div>
             ) : (
-              <form onSubmit={handleSaveUser} className="space-y-3">
+              <form onSubmit={handleSaveUser} className="space-y-3" id="user-dialog-description">
                 <div id="dialog-description">
                   {formErrors.general && formErrors.general.length > 0 && (
                     <Alert variant="destructive" className="mb-3">
@@ -1051,7 +1064,7 @@ export default function UserManagementEnhanced() {
                     {/* Tarjeta RFID */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-3">
                       <Label htmlFor="numeroTarjetaRFID" className="text-left sm:text-right text-sm">
-                        Tarjeta RFID
+                        Número Tarjeta RFID
                       </Label>
                       <div className="col-span-1 sm:col-span-2">
                         <Input
@@ -1060,7 +1073,7 @@ export default function UserManagementEnhanced() {
                           value={formData.numeroTarjetaRFID || ""}
                           onChange={(e) => handleInputChange("numeroTarjetaRFID", e.target.value)}
                           className={`text-sm ${hasFieldError("numeroTarjetaRFID") ? "border-red-500" : ""}`}
-                          placeholder="Número RFID (opcional)"
+                          placeholder="Número de tarjeta RFID"
                         />
                         {hasFieldError("numeroTarjetaRFID") && (
                           <p className="text-red-500 text-xs mt-1">{getFieldError("numeroTarjetaRFID")}</p>
@@ -1088,10 +1101,15 @@ export default function UserManagementEnhanced() {
           <DialogContent className="max-w-md" aria-describedby="delete-dialog-description">
             <DialogHeader>
               <DialogTitle className="text-lg">Confirmar Eliminación</DialogTitle>
-              <DialogDescription id="delete-dialog-description" className="text-sm">
-                ¿Está seguro que desea eliminar al usuario "{selectedUser?.nombre}"?
-              </DialogDescription>
             </DialogHeader>
+            <div id="delete-dialog-description" className="text-sm text-gray-600 mb-4">
+              ¿Está seguro que desea eliminar al usuario "{selectedUser?.nombre}"?
+              {!navigator.onLine && (
+                <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-yellow-800">
+                  La eliminación se realizará cuando se restaure la conexión.
+                </div>
+              )}
+            </div>
             <DialogFooter className="flex flex-col sm:flex-row gap-2">
               <Button
                 size="sm"

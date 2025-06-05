@@ -6,23 +6,7 @@ import { jsPDF } from "jspdf"
 import autoTable from "jspdf-autotable"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
-import {
-  Plus,
-  Edit,
-  Trash2,
-  Eye,
-  Save,
-  X,
-  Loader2,
-  CheckCircle,
-  AlertCircle,
-  Download,
-  ChevronLeft,
-  ChevronRight,
-  Search,
-  Filter,
-  WifiOff,
-} from "lucide-react"
+import { Plus, Edit, Trash2, Eye, Save, X, Loader2, CheckCircle, AlertCircle, Download, ChevronLeft, ChevronRight, Search, Filter, WifiOff } from 'lucide-react'
 
 import { Button } from "@/components/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/components/ui/card"
@@ -459,7 +443,7 @@ export default function PreciosOffline() {
 
   return (
     <NetworkStatusHandler onOffline={() => console.log("Modo offline activado")} onOnline={() => fetchPrecios()}>
-      <div className="min-h-screen bg-gray-100">
+      <div className="min-h-screen bg-gray-50">
         <Toaster />
 
         {/* Notificación emergente */}
@@ -485,7 +469,7 @@ export default function PreciosOffline() {
           </div>
         )}
 
-        <div className="container mx-auto px-4 py-8 pt-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-20">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-2xl font-bold text-center">Gestión de Precios de Carga de Agua</h1>
             <OfflineIndicator />

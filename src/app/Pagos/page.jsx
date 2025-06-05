@@ -2,22 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import {
-  ChevronLeft,
-  ChevronRight,
-  Trash2,
-  Filter,
-  Eye,
-  Download,
-  Receipt,
-  AlertTriangle,
-  X,
-  User,
-  Calendar,
-  CreditCard,
-  FileText,
-  WifiOff,
-} from "lucide-react"
+import { ChevronLeft, ChevronRight, Trash2, Filter, Eye, Download, Receipt, AlertTriangle, X, User, Calendar, CreditCard, FileText, WifiOff } from 'lucide-react'
 import { jsPDF } from "jspdf"
 import Swal from "sweetalert2"
 
@@ -497,564 +482,566 @@ export default function PagosOffline() {
 
   return (
     <NetworkStatusHandler onOffline={() => console.log("Modo offline activado")} onOnline={() => fetchPagos()}>
-      <div className="container mx-auto px-4 py-8 mt-16 max-w-6xl">
-        <Toaster />
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 mt-16">
+          <Toaster />
 
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">Gestión de Pagos de Carga de Agua</h1>
-          <OfflineIndicator />
-        </div>
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-2xl font-bold">Gestión de Pagos de Carga de Agua</h1>
+            <OfflineIndicator />
+          </div>
 
-        <InstallPrompt />
-        <SyncManagerEnhanced onSync={fetchPagos} />
-        <CacheIndicator />
-        <BackgroundSyncEnhanced
-          syncTag="pagos-sync"
-          onSyncRegistered={() => console.log("Sync registrado para pagos")}
-          onSyncError={(error) => console.error("Error en Background Sync:", error)}
-        />
+          <InstallPrompt />
+          <SyncManagerEnhanced onSync={fetchPagos} />
+          <CacheIndicator />
+          <BackgroundSyncEnhanced
+            syncTag="pagos-sync"
+            onSyncRegistered={() => console.log("Sync registrado para pagos")}
+            onSyncError={(error) => console.error("Error en Background Sync:", error)}
+          />
 
-        <div className="flex justify-start items-center mb-6">
-          <Button onClick={() => setShowFilterModal(true)}>
-            <Filter className="mr-2 h-4 w-4" /> Filtros
-          </Button>
-        </div>
+          <div className="flex justify-start items-center mb-6">
+            <Button onClick={() => setShowFilterModal(true)}>
+              <Filter className="mr-2 h-4 w-4" /> Filtros
+            </Button>
+          </div>
 
-        <Card className="mb-6 border border-gray-300 shadow-sm">
-          <CardHeader>
-            <CardTitle>Listado de Pagos de Carga de Agua</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isMobile ? (
-              <div className="space-y-4">
-                {currentPagos.map((pago) => (
-                  <Card
-                    key={pago.id}
-                    className={`border border-gray-200 ${pago._isPendingDelete ? "bg-yellow-50 border-l-4 border-yellow-400" : ""}`}
-                  >
-                    <CardContent className="p-4">
-                      <p>
-                        <strong>Usuario:</strong> {pago.usuario?.nombre || pago.usuario?.username || "N/A"}
-                      </p>
-                      <p>
-                        <strong>Monto:</strong> Bs {pago.monto}
-                      </p>
-                      <p>
-                        <strong>Fecha:</strong>{" "}
-                        {new Date(pago.fechaHora).toLocaleDateString("es-ES", {
-                          weekday: "long",
-                          day: "numeric",
-                          month: "long",
-                          year: "numeric",
-                        })}
-                      </p>
-                      <p>
-                        <strong>Cargas:</strong> {pago.cargas?.length || pago.cargaAguaIds?.length || 0}
-                      </p>
-                      {pago._isPendingDelete && (
-                        <Badge
-                          variant="outline"
-                          className="mt-2 bg-yellow-100 text-yellow-700 border-yellow-300 text-xs"
-                        >
-                          Pendiente eliminar
-                        </Badge>
-                      )}
-                    </CardContent>
-                    <CardFooter className="flex justify-between">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleVerPago(pago)}
-                        className="bg-blue-100 hover:bg-blue-200 text-blue-800 border-blue-200"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleDescargarPDF(pago)}
-                        className="bg-green-100 hover:bg-green-200 text-green-800 border-green-200"
-                      >
-                        <Download className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setSelectedPago(pago)
-                          setShowDeleteModal(true)
-                        }}
-                        className="bg-red-100 hover:bg-red-200 text-red-800 border-red-200"
-                        disabled={pago._isPendingDelete}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </CardFooter>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <Table>
-                <TableHeader className="bg-gray-200 border-b-2 border-gray-300 shadow-md">
-                  <TableRow>
-                    <TableHead className="font-bold text-gray-700 border-r border-gray-300">Usuario</TableHead>
-                    <TableHead className="font-bold text-gray-700 border-r border-gray-300">Monto</TableHead>
-                    <TableHead className="font-bold text-gray-700 border-r border-gray-300">Cargas</TableHead>
-                    <TableHead className="font-bold text-gray-700 border-r border-gray-300">Fecha</TableHead>
-                    <TableHead className="font-bold text-gray-700">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+          <Card className="mb-6 border border-gray-300 shadow-sm">
+            <CardHeader>
+              <CardTitle>Listado de Pagos de Carga de Agua</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isMobile ? (
+                <div className="space-y-4">
                   {currentPagos.map((pago) => (
-                    <TableRow
+                    <Card
                       key={pago.id}
-                      className={pago._isPendingDelete ? "bg-yellow-50 border-l-4 border-yellow-400" : ""}
+                      className={`border border-gray-200 ${pago._isPendingDelete ? "bg-yellow-50 border-l-4 border-yellow-400" : ""}`}
                     >
-                      <TableCell>
-                        {pago.usuario?.nombre || pago.usuario?.username || "N/A"}
+                      <CardContent className="p-4">
+                        <p>
+                          <strong>Usuario:</strong> {pago.usuario?.nombre || pago.usuario?.username || "N/A"}
+                        </p>
+                        <p>
+                          <strong>Monto:</strong> Bs {pago.monto}
+                        </p>
+                        <p>
+                          <strong>Fecha:</strong>{" "}
+                          {new Date(pago.fechaHora).toLocaleDateString("es-ES", {
+                            weekday: "long",
+                            day: "numeric",
+                            month: "long",
+                            year: "numeric",
+                          })}
+                        </p>
+                        <p>
+                          <strong>Cargas:</strong> {pago.cargas?.length || pago.cargaAguaIds?.length || 0}
+                        </p>
                         {pago._isPendingDelete && (
                           <Badge
                             variant="outline"
-                            className="ml-2 bg-yellow-100 text-yellow-700 border-yellow-300 text-xs"
+                            className="mt-2 bg-yellow-100 text-yellow-700 border-yellow-300 text-xs"
                           >
                             Pendiente eliminar
                           </Badge>
                         )}
-                      </TableCell>
-                      <TableCell>Bs {pago.monto}</TableCell>
-                      <TableCell>{pago.cargas?.length || pago.cargaAguaIds?.length || 0}</TableCell>
-                      <TableCell>
-                        {new Date(pago.fechaHora).toLocaleDateString("es-ES", {
-                          weekday: "long",
-                          day: "numeric",
-                          month: "long",
-                          year: "numeric",
-                        })}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex space-x-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleVerPago(pago)}
-                            className="bg-blue-100 hover:bg-blue-200 text-blue-800 border-blue-200"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleDescargarPDF(pago)}
-                            className="bg-green-100 hover:bg-green-200 text-green-800 border-green-200"
-                          >
-                            <Download className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setSelectedPago(pago)
-                              setShowDeleteModal(true)
-                            }}
-                            className="bg-red-100 hover:bg-red-200 text-red-800 border-red-200"
-                            disabled={pago._isPendingDelete}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
+                      </CardContent>
+                      <CardFooter className="flex justify-between">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleVerPago(pago)}
+                          className="bg-blue-100 hover:bg-blue-200 text-blue-800 border-blue-200"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleDescargarPDF(pago)}
+                          className="bg-green-100 hover:bg-green-200 text-green-800 border-green-200"
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedPago(pago)
+                            setShowDeleteModal(true)
+                          }}
+                          className="bg-red-100 hover:bg-red-200 text-red-800 border-red-200"
+                          disabled={pago._isPendingDelete}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </CardFooter>
+                    </Card>
                   ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader className="bg-gray-200 border-b-2 border-gray-300 shadow-md">
+                    <TableRow>
+                      <TableHead className="font-bold text-gray-700 border-r border-gray-300">Usuario</TableHead>
+                      <TableHead className="font-bold text-gray-700 border-r border-gray-300">Monto</TableHead>
+                      <TableHead className="font-bold text-gray-700 border-r border-gray-300">Cargas</TableHead>
+                      <TableHead className="font-bold text-gray-700 border-r border-gray-300">Fecha</TableHead>
+                      <TableHead className="font-bold text-gray-700">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {currentPagos.map((pago) => (
+                      <TableRow
+                        key={pago.id}
+                        className={pago._isPendingDelete ? "bg-yellow-50 border-l-4 border-yellow-400" : ""}
+                      >
+                        <TableCell>
+                          {pago.usuario?.nombre || pago.usuario?.username || "N/A"}
+                          {pago._isPendingDelete && (
+                            <Badge
+                              variant="outline"
+                              className="ml-2 bg-yellow-100 text-yellow-700 border-yellow-300 text-xs"
+                            >
+                              Pendiente eliminar
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>Bs {pago.monto}</TableCell>
+                        <TableCell>{pago.cargas?.length || pago.cargaAguaIds?.length || 0}</TableCell>
+                        <TableCell>
+                          {new Date(pago.fechaHora).toLocaleDateString("es-ES", {
+                            weekday: "long",
+                            day: "numeric",
+                            month: "long",
+                            year: "numeric",
+                          })}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex space-x-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleVerPago(pago)}
+                              className="bg-blue-100 hover:bg-blue-200 text-blue-800 border-blue-200"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDescargarPDF(pago)}
+                              className="bg-green-100 hover:bg-green-200 text-green-800 border-green-200"
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setSelectedPago(pago)
+                                setShowDeleteModal(true)
+                              }}
+                              className="bg-red-100 hover:bg-red-200 text-red-800 border-red-200"
+                              disabled={pago._isPendingDelete}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
 
-        <div className="flex justify-between items-center mt-4">
-          <Button onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))} disabled={currentPage === 1}>
-            <ChevronLeft className="mr-2 h-4 w-4" /> Anterior
-          </Button>
-          <span>
-            Página {currentPage} de {totalPages}
-          </span>
-          <Button
-            onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-            disabled={currentPage === totalPages}
-          >
-            Siguiente <ChevronRight className="ml-2 h-4 w-4" />
-          </Button>
-        </div>
+          <div className="flex justify-between items-center mt-4">
+            <Button onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))} disabled={currentPage === 1}>
+              <ChevronLeft className="mr-2 h-4 w-4" /> Anterior
+            </Button>
+            <span>
+              Página {currentPage} de {totalPages}
+            </span>
+            <Button
+              onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+            >
+              Siguiente <ChevronRight className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
 
-        {/* Diálogo de Detalles del Pago */}
-        <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center text-blue-600">
-                <FileText className="mr-2 h-5 w-5" />
-                Detalles del Pago
-              </DialogTitle>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="absolute right-4 top-4"
-                onClick={() => setShowDetailsDialog(false)}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </DialogHeader>
+          {/* Diálogo de Detalles del Pago */}
+          <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="flex items-center text-blue-600">
+                  <FileText className="mr-2 h-5 w-5" />
+                  Detalles del Pago
+                </DialogTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-4 top-4"
+                  onClick={() => setShowDetailsDialog(false)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </DialogHeader>
 
-            {selectedPago && (
-              <div className="space-y-6">
-                {/* Información General del Pago */}
-                <Card className="border-blue-200">
-                  <CardHeader className="bg-blue-50">
-                    <CardTitle className="flex items-center text-blue-800">
-                      <CreditCard className="mr-2 h-5 w-5" />
-                      Información del Pago
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium text-gray-600">ID del Pago</Label>
-                        <div className="flex items-center space-x-2">
-                          <Badge variant="outline" className="font-mono">
-                            #{selectedPago.id}
+              {selectedPago && (
+                <div className="space-y-6">
+                  {/* Información General del Pago */}
+                  <Card className="border-blue-200">
+                    <CardHeader className="bg-blue-50">
+                      <CardTitle className="flex items-center text-blue-800">
+                        <CreditCard className="mr-2 h-5 w-5" />
+                        Información del Pago
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium text-gray-600">ID del Pago</Label>
+                          <div className="flex items-center space-x-2">
+                            <Badge variant="outline" className="font-mono">
+                              #{selectedPago.id}
+                            </Badge>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium text-gray-600">Número de Recibo</Label>
+                          <div className="font-mono text-blue-600 font-medium">
+                            {generarNumeroRecibo(selectedPago.id, selectedPago.usuario?.ci)}
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium text-gray-600">Monto Total</Label>
+                          <div className="text-2xl font-bold text-green-600">Bs {selectedPago.monto?.toFixed(2)}</div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium text-gray-600">Fecha y Hora</Label>
+                          <div className="flex items-center space-x-2">
+                            <Calendar className="h-4 w-4 text-gray-500" />
+                            <span>
+                              {new Date(selectedPago.fechaHora).toLocaleString("es-ES", {
+                                weekday: "long",
+                                year: "numeric",
+                                month: "long",
+                                day: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium text-gray-600">Cargas Pagadas</Label>
+                          <Badge variant="secondary" className="text-lg">
+                            {selectedPago.cargas?.length || selectedPago.cargaAguaIds?.length || 0} cargas
                           </Badge>
                         </div>
-                      </div>
 
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium text-gray-600">Número de Recibo</Label>
-                        <div className="font-mono text-blue-600 font-medium">
-                          {generarNumeroRecibo(selectedPago.id, selectedPago.usuario?.ci)}
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium text-gray-600">Estado</Label>
+                          <Badge className="bg-green-100 text-green-800 border-green-200">Pagado</Badge>
                         </div>
                       </div>
+                    </CardContent>
+                  </Card>
 
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium text-gray-600">Monto Total</Label>
-                        <div className="text-2xl font-bold text-green-600">Bs {selectedPago.monto?.toFixed(2)}</div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium text-gray-600">Fecha y Hora</Label>
-                        <div className="flex items-center space-x-2">
-                          <Calendar className="h-4 w-4 text-gray-500" />
-                          <span>
-                            {new Date(selectedPago.fechaHora).toLocaleString("es-ES", {
-                              weekday: "long",
-                              year: "numeric",
-                              month: "long",
-                              day: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium text-gray-600">Cargas Pagadas</Label>
-                        <Badge variant="secondary" className="text-lg">
-                          {selectedPago.cargas?.length || selectedPago.cargaAguaIds?.length || 0} cargas
-                        </Badge>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium text-gray-600">Estado</Label>
-                        <Badge className="bg-green-100 text-green-800 border-green-200">Pagado</Badge>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Información del Cliente */}
-                <Card className="border-purple-200">
-                  <CardHeader className="bg-purple-50">
-                    <CardTitle className="flex items-center text-purple-800">
-                      <User className="mr-2 h-5 w-5" />
-                      Información del Cliente
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium text-gray-600">Nombre</Label>
-                        <div className="font-medium">
-                          {selectedPago.usuario?.nombre || selectedPago.usuario?.username || "N/A"}
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium text-gray-600">Cédula de Identidad</Label>
-                        <div className="font-mono">{selectedPago.usuario?.ci || "No disponible"}</div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium text-gray-600">Correo Electrónico</Label>
-                        <div className="text-blue-600">{selectedPago.usuario?.correo || "No disponible"}</div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium text-gray-600">Rol</Label>
-                        <Badge variant="outline">{selectedPago.usuario?.rol || "Cliente"}</Badge>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium text-gray-600">ID Usuario</Label>
-                        <div className="font-mono text-gray-500">#{selectedPago.usuario?.id}</div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Detalle de Cargas Pagadas */}
-                <Card className="border-green-200">
-                  <CardHeader className="bg-green-50">
-                    <CardTitle className="flex items-center text-green-800">
-                      <Receipt className="mr-2 h-5 w-5" />
-                      Detalle de Cargas Pagadas
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-6">
-                    {selectedPago.cargas && selectedPago.cargas.length > 0 ? (
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-                          <div className="bg-blue-50 p-3 rounded-lg">
-                            <div className="text-sm text-blue-600 font-medium">Total de Cargas</div>
-                            <div className="text-2xl font-bold text-blue-800">{selectedPago.cargas.length}</div>
+                  {/* Información del Cliente */}
+                  <Card className="border-purple-200">
+                    <CardHeader className="bg-purple-50">
+                      <CardTitle className="flex items-center text-purple-800">
+                        <User className="mr-2 h-5 w-5" />
+                        Información del Cliente
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium text-gray-600">Nombre</Label>
+                          <div className="font-medium">
+                            {selectedPago.usuario?.nombre || selectedPago.usuario?.username || "N/A"}
                           </div>
-                          <div className="bg-green-50 p-3 rounded-lg">
-                            <div className="text-sm text-green-600 font-medium">Monto Total</div>
-                            <div className="text-2xl font-bold text-green-800">
-                              Bs{" "}
-                              {selectedPago.cargas.reduce((total, carga) => total + (carga.costo || 30), 0).toFixed(2)}
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium text-gray-600">Cédula de Identidad</Label>
+                          <div className="font-mono">{selectedPago.usuario?.ci || "No disponible"}</div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium text-gray-600">Correo Electrónico</Label>
+                          <div className="text-blue-600">{selectedPago.usuario?.correo || "No disponible"}</div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium text-gray-600">Rol</Label>
+                          <Badge variant="outline">{selectedPago.usuario?.rol || "Cliente"}</Badge>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium text-gray-600">ID Usuario</Label>
+                          <div className="font-mono text-gray-500">#{selectedPago.usuario?.id}</div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Detalle de Cargas Pagadas */}
+                  <Card className="border-green-200">
+                    <CardHeader className="bg-green-50">
+                      <CardTitle className="flex items-center text-green-800">
+                        <Receipt className="mr-2 h-5 w-5" />
+                        Detalle de Cargas Pagadas
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      {selectedPago.cargas && selectedPago.cargas.length > 0 ? (
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                            <div className="bg-blue-50 p-3 rounded-lg">
+                              <div className="text-sm text-blue-600 font-medium">Total de Cargas</div>
+                              <div className="text-2xl font-bold text-blue-800">{selectedPago.cargas.length}</div>
+                            </div>
+                            <div className="bg-green-50 p-3 rounded-lg">
+                              <div className="text-sm text-green-600 font-medium">Monto Total</div>
+                              <div className="text-2xl font-bold text-green-800">
+                                Bs{" "}
+                                {selectedPago.cargas.reduce((total, carga) => total + (carga.costo || 30), 0).toFixed(2)}
+                              </div>
+                            </div>
+                            <div className="bg-purple-50 p-3 rounded-lg">
+                              <div className="text-sm text-purple-600 font-medium">Promedio por Carga</div>
+                              <div className="text-2xl font-bold text-purple-800">
+                                Bs{" "}
+                                {(
+                                  selectedPago.cargas.reduce((total, carga) => total + (carga.costo || 30), 0) /
+                                  selectedPago.cargas.length
+                                ).toFixed(2)}
+                              </div>
                             </div>
                           </div>
-                          <div className="bg-purple-50 p-3 rounded-lg">
-                            <div className="text-sm text-purple-600 font-medium">Promedio por Carga</div>
-                            <div className="text-2xl font-bold text-purple-800">
-                              Bs{" "}
-                              {(
-                                selectedPago.cargas.reduce((total, carga) => total + (carga.costo || 30), 0) /
-                                selectedPago.cargas.length
-                              ).toFixed(2)}
-                            </div>
-                          </div>
-                        </div>
 
-                        <Separator />
+                          <Separator />
 
-                        <div className="space-y-3">
-                          <h4 className="font-medium text-gray-800">Lista de Cargas:</h4>
-                          <div className="max-h-64 overflow-y-auto border rounded-lg">
-                            <Table>
-                              <TableHeader className="bg-gray-50">
-                                <TableRow>
-                                  <TableHead className="font-medium">ID Carga</TableHead>
-                                  <TableHead className="font-medium">Fecha</TableHead>
-                                  <TableHead className="font-medium">Hora</TableHead>
-                                  <TableHead className="font-medium">Costo</TableHead>
-                                  <TableHead className="font-medium">Estado</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {selectedPago.cargas.map((carga, index) => (
-                                  <TableRow key={carga.id} className={index % 2 === 0 ? "bg-gray-50" : "bg-white"}>
-                                    <TableCell className="font-mono">#{carga.id}</TableCell>
-                                    <TableCell>
-                                      {new Date(carga.fechaHora).toLocaleDateString("es-ES", {
-                                        day: "2-digit",
-                                        month: "2-digit",
-                                        year: "numeric",
-                                      })}
-                                    </TableCell>
-                                    <TableCell>
-                                      {new Date(carga.fechaHora).toLocaleTimeString("es-ES", {
-                                        hour: "2-digit",
-                                        minute: "2-digit",
-                                      })}
-                                    </TableCell>
-                                    <TableCell className="font-medium text-green-600">Bs {carga.costo || 30}</TableCell>
-                                    <TableCell>
-                                      <Badge className="bg-green-100 text-green-800 border-green-200">Pagado</Badge>
-                                    </TableCell>
+                          <div className="space-y-3">
+                            <h4 className="font-medium text-gray-800">Lista de Cargas:</h4>
+                            <div className="max-h-64 overflow-y-auto border rounded-lg">
+                              <Table>
+                                <TableHeader className="bg-gray-50">
+                                  <TableRow>
+                                    <TableHead className="font-medium">ID Carga</TableHead>
+                                    <TableHead className="font-medium">Fecha</TableHead>
+                                    <TableHead className="font-medium">Hora</TableHead>
+                                    <TableHead className="font-medium">Costo</TableHead>
+                                    <TableHead className="font-medium">Estado</TableHead>
                                   </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
+                                </TableHeader>
+                                <TableBody>
+                                  {selectedPago.cargas.map((carga, index) => (
+                                    <TableRow key={carga.id} className={index % 2 === 0 ? "bg-gray-50" : "bg-white"}>
+                                      <TableCell className="font-mono">#{carga.id}</TableCell>
+                                      <TableCell>
+                                        {new Date(carga.fechaHora).toLocaleDateString("es-ES", {
+                                          day: "2-digit",
+                                          month: "2-digit",
+                                          year: "numeric",
+                                        })}
+                                      </TableCell>
+                                      <TableCell>
+                                        {new Date(carga.fechaHora).toLocaleTimeString("es-ES", {
+                                          hour: "2-digit",
+                                          minute: "2-digit",
+                                        })}
+                                      </TableCell>
+                                      <TableCell className="font-medium text-green-600">Bs {carga.costo || 30}</TableCell>
+                                      <TableCell>
+                                        <Badge className="bg-green-100 text-green-800 border-green-200">Pagado</Badge>
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="text-center py-8 text-gray-500">
-                        <Receipt className="mx-auto h-12 w-12 text-gray-300 mb-4" />
-                        <p>No se encontraron detalles de cargas para este pago</p>
-                        <p className="text-sm mt-2">Cargas registradas: {selectedPago.cargaAguaIds?.length || 0}</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-            )}
-
-            <DialogFooter className="flex justify-between pt-6">
-              <div className="flex space-x-2">
-                <Button
-                  variant="outline"
-                  onClick={() => selectedPago && handleDescargarPDF(selectedPago)}
-                  className="flex items-center"
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  Descargar PDF
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowDetailsDialog(false)
-                    setShowDeleteModal(true)
-                  }}
-                  className="flex items-center text-red-600 border-red-200 hover:bg-red-50"
-                  disabled={selectedPago?._isPendingDelete}
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Eliminar Pago
-                </Button>
-              </div>
-              <Button onClick={() => setShowDetailsDialog(false)}>Cerrar</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Modal de confirmación para eliminar */}
-        <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
-          <DialogContent className="border-2 border-gray-300">
-            <DialogHeader>
-              <DialogTitle className="flex items-center text-red-600">
-                <AlertTriangle className="mr-2 h-5 w-5" />
-                Confirmar Eliminación
-              </DialogTitle>
-              <DialogDescription>
-                ¿Está seguro que desea eliminar este pago? Esta acción no se puede deshacer.
-                {!isOnline && " Se marcará para eliminar cuando vuelva la conexión."}
-              </DialogDescription>
-            </DialogHeader>
-
-            {selectedPago && (
-              <div className="space-y-4">
-                {!isOnline && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                    <div className="flex items-center gap-2 text-yellow-800">
-                      <WifiOff className="h-4 w-4" />
-                      <span className="text-sm">Sin conexión - Se marcará para eliminar cuando vuelva la conexión</span>
-                    </div>
-                  </div>
-                )}
-
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                  <h4 className="font-medium text-yellow-800 mb-2">⚠️ Advertencia:</h4>
-                  <p className="text-sm text-yellow-700 mb-3">
-                    Al eliminar este pago, las siguientes cargas volverán al estado de "deuda":
-                  </p>
-
-                  {selectedPago.cargas && selectedPago.cargas.length > 0 ? (
-                    <div className="max-h-32 overflow-y-auto border rounded p-2 bg-white">
-                      {selectedPago.cargas.map((carga, index) => (
-                        <div key={carga.id} className="flex justify-between text-sm py-1 border-b last:border-b-0">
-                          <span>
-                            Carga #{carga.id} - {new Date(carga.fechaHora).toLocaleDateString()}
-                          </span>
-                          <span className="font-medium text-red-600">Bs {carga.costo}</span>
+                      ) : (
+                        <div className="text-center py-8 text-gray-500">
+                          <Receipt className="mx-auto h-12 w-12 text-gray-300 mb-4" />
+                          <p>No se encontraron detalles de cargas para este pago</p>
+                          <p className="text-sm mt-2">Cargas registradas: {selectedPago.cargaAguaIds?.length || 0}</p>
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-sm text-gray-600 bg-white p-2 rounded border">
-                      {selectedPago.cargaAguaIds?.length || 0} cargas volverán al estado de deuda
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+
+              <DialogFooter className="flex justify-between pt-6">
+                <div className="flex space-x-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => selectedPago && handleDescargarPDF(selectedPago)}
+                    className="flex items-center"
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Descargar PDF
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowDetailsDialog(false)
+                      setShowDeleteModal(true)
+                    }}
+                    className="flex items-center text-red-600 border-red-200 hover:bg-red-50"
+                    disabled={selectedPago?._isPendingDelete}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Eliminar Pago
+                  </Button>
+                </div>
+                <Button onClick={() => setShowDetailsDialog(false)}>Cerrar</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Modal de confirmación para eliminar */}
+          <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
+            <DialogContent className="border-2 border-gray-300">
+              <DialogHeader>
+                <DialogTitle className="flex items-center text-red-600">
+                  <AlertTriangle className="mr-2 h-5 w-5" />
+                  Confirmar Eliminación
+                </DialogTitle>
+                <DialogDescription>
+                  ¿Está seguro que desea eliminar este pago? Esta acción no se puede deshacer.
+                  {!isOnline && " Se marcará para eliminar cuando vuelva la conexión."}
+                </DialogDescription>
+              </DialogHeader>
+
+              {selectedPago && (
+                <div className="space-y-4">
+                  {!isOnline && (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                      <div className="flex items-center gap-2 text-yellow-800">
+                        <WifiOff className="h-4 w-4" />
+                        <span className="text-sm">Sin conexión - Se marcará para eliminar cuando vuelva la conexión</span>
+                      </div>
                     </div>
                   )}
 
-                  <div className="mt-3 pt-2 border-t border-yellow-200">
-                    <div className="flex justify-between font-medium text-yellow-800">
-                      <span>Total del pago a eliminar:</span>
-                      <span>Bs {selectedPago.monto}</span>
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <h4 className="font-medium text-yellow-800 mb-2">⚠️ Advertencia:</h4>
+                    <p className="text-sm text-yellow-700 mb-3">
+                      Al eliminar este pago, las siguientes cargas volverán al estado de "deuda":
+                    </p>
+
+                    {selectedPago.cargas && selectedPago.cargas.length > 0 ? (
+                      <div className="max-h-32 overflow-y-auto border rounded p-2 bg-white">
+                        {selectedPago.cargas.map((carga, index) => (
+                          <div key={carga.id} className="flex justify-between text-sm py-1 border-b last:border-b-0">
+                            <span>
+                              Carga #{carga.id} - {new Date(carga.fechaHora).toLocaleDateString()}
+                            </span>
+                            <span className="font-medium text-red-600">Bs {carga.costo}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-600 bg-white p-2 rounded border">
+                        {selectedPago.cargaAguaIds?.length || 0} cargas volverán al estado de deuda
+                      </div>
+                    )}
+
+                    <div className="mt-3 pt-2 border-t border-yellow-200">
+                      <div className="flex justify-between font-medium text-yellow-800">
+                        <span>Total del pago a eliminar:</span>
+                        <span>Bs {selectedPago.monto}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowDeleteModal(false)}>
-                Cancelar
-              </Button>
-              <Button variant="destructive" onClick={handleDeletePago}>
-                <Trash2 className="mr-2 h-4 w-4" />
-                Eliminar Pago
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowDeleteModal(false)}>
+                  Cancelar
+                </Button>
+                <Button variant="destructive" onClick={handleDeletePago}>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Eliminar Pago
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
-        {/* Modal de filtros */}
-        <Dialog open={showFilterModal} onOpenChange={setShowFilterModal}>
-          <DialogContent className="border-2 border-gray-300">
-            <DialogHeader>
-              <DialogTitle>Filtrar Pagos</DialogTitle>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="usuarioFiltro" className="text-right">
-                  Usuario:
-                </Label>
-                <Input
-                  id="usuarioFiltro"
-                  type="text"
-                  placeholder="Buscar por nombre..."
-                  value={usuarioFiltro}
-                  onChange={(e) => setUsuarioFiltro(e.target.value)}
-                  className="col-span-3 border-2 border-gray-300"
-                />
+          {/* Modal de filtros */}
+          <Dialog open={showFilterModal} onOpenChange={setShowFilterModal}>
+            <DialogContent className="border-2 border-gray-300">
+              <DialogHeader>
+                <DialogTitle>Filtrar Pagos</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="usuarioFiltro" className="text-right">
+                    Usuario:
+                  </Label>
+                  <Input
+                    id="usuarioFiltro"
+                    type="text"
+                    placeholder="Buscar por nombre..."
+                    value={usuarioFiltro}
+                    onChange={(e) => setUsuarioFiltro(e.target.value)}
+                    className="col-span-3 border-2 border-gray-300"
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="fechaInicio" className="text-right">
+                    Fecha Inicio:
+                  </Label>
+                  <Input
+                    id="fechaInicio"
+                    type="date"
+                    value={fechaInicio}
+                    onChange={(e) => setFechaInicio(e.target.value)}
+                    className="col-span-3 border-2 border-gray-300"
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="fechaFin" className="text-right">
+                    Fecha Fin:
+                  </Label>
+                  <Input
+                    id="fechaFin"
+                    type="date"
+                    value={fechaFin}
+                    onChange={(e) => setFechaFin(e.target.value)}
+                    className="col-span-3 border-2 border-gray-300"
+                  />
+                </div>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="fechaInicio" className="text-right">
-                  Fecha Inicio:
-                </Label>
-                <Input
-                  id="fechaInicio"
-                  type="date"
-                  value={fechaInicio}
-                  onChange={(e) => setFechaInicio(e.target.value)}
-                  className="col-span-3 border-2 border-gray-300"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="fechaFin" className="text-right">
-                  Fecha Fin:
-                </Label>
-                <Input
-                  id="fechaFin"
-                  type="date"
-                  value={fechaFin}
-                  onChange={(e) => setFechaFin(e.target.value)}
-                  className="col-span-3 border-2 border-gray-300"
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button
-                onClick={() => {
-                  setCurrentPage(1)
-                  setShowFilterModal(false)
-                }}
-                className="border-2 border-gray-300"
-              >
-                Aplicar Filtros
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              <DialogFooter>
+                <Button
+                  onClick={() => {
+                    setCurrentPage(1)
+                    setShowFilterModal(false)
+                  }}
+                  className="border-2 border-gray-300"
+                >
+                  Aplicar Filtros
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
     </NetworkStatusHandler>
   )

@@ -13,7 +13,6 @@ import {
   PieChart,
   Activity,
   RefreshCw,
-  FileText,
   CreditCard,
   Loader2,
   Calendar,
@@ -27,6 +26,19 @@ import { Progress } from "@/components/components/ui/progress"
 import { Input } from "@/components/components/ui/input"
 import { Label } from "@/components/components/ui/label"
 import jsPDF from "jspdf"
+
+// Importar componentes PWA
+import OfflineIndicator from "@/components/pwa-features/offline-indicator"
+import NetworkStatusHandler from "@/components/pwa-features/network-status-handler"
+import InstallPrompt from "@/components/pwa-features/install-prompt"
+import CacheIndicator from "@/components/pwa-features/cache-indicator"
+import SyncManagerEnhanced from "@/components/pwa-features/sync-manager"
+import BackgroundSyncEnhanced from "@/components/pwa-features/background-sync"
+
+// Importar utilidades PWA
+import { usePWAFeatures } from "../../hooks/use-pwa-features"
+import { saveToIndexedDB, getFromIndexedDB, initializeBackgroundSync } from "../../utils/pwa-helpers"
+
 // URL de la API
 const API_URL = "https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev"
 
@@ -35,6 +47,9 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [dashboardData, setDashboardData] = useState(null)
   const [error, setError] = useState("")
+
+  const { isOnline, updatePendingSyncCount } = usePWAFeatures()
+  const [usingCachedData, setUsingCachedData] = useState(false)
 
   // Estados para filtros de fecha
   const [fechaInicio, setFechaInicio] = useState("")
@@ -66,6 +81,11 @@ export default function DashboardPage() {
     }
   }, [fechaInicio, fechaFin])
 
+  useEffect(() => {
+    // Inicializar background sync
+    initializeBackgroundSync()
+  }, [])
+
   const fetchDashboardData = async () => {
     try {
       setLoading(true)
@@ -75,6 +95,18 @@ export default function DashboardPage() {
       if (!token) {
         router.push("/login")
         return
+      }
+
+      if (!isOnline) {
+        // Cargar desde IndexedDB cuando está offline
+        const cacheKey = `dashboard_${fechaInicio}_${fechaFin}`
+        const cachedData = await getFromIndexedDB("dashboard", cacheKey)
+        if (cachedData && cachedData.data) {
+          setDashboardData(cachedData.data)
+          setUsingCachedData(true)
+          setError("")
+          return
+        }
       }
 
       const response = await fetch(`${API_URL}/dashboard`, {
@@ -100,9 +132,22 @@ export default function DashboardPage() {
 
       const data = await response.json()
       setDashboardData(data)
+      setUsingCachedData(false)
+
+      // Guardar en caché
+      const cacheKey = `dashboard_${fechaInicio}_${fechaFin}`
+      await saveToIndexedDB("dashboard", { id: cacheKey, data, timestamp: Date.now() })
     } catch (error) {
       console.error("Error:", error)
       setError("Error al cargar los datos del dashboard")
+
+      // Cargar desde caché en caso de error
+      const cacheKey = `dashboard_${fechaInicio}_${fechaFin}`
+      const cachedData = await getFromIndexedDB("dashboard", cacheKey)
+      if (cachedData && cachedData.data) {
+        setDashboardData(cachedData.data)
+        setUsingCachedData(true)
+      }
     } finally {
       setLoading(false)
     }
@@ -472,320 +517,343 @@ export default function DashboardPage() {
   const { estadisticasGenerales, cargasPorDia, parametros } = dashboardData || {}
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <div className="sticky top-0 z-50 w-full">
-        <Navbar />
-      </div>
-
-      <div className="container mx-auto px-3 py-4 pt-16 max-w-4xl">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3 mb-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">Dashboard Ejecutivo</h1>
-            <p className="text-gray-600 text-sm">Distribuidora de Agua Los Pinos</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {dashboardData && (
-              <Button onClick={exportDashboardToPDF} className="bg-slate-900 hover:bg-slate-950" size="sm">
-                <Download className="mr-2 h-4 w-4" />
-                Exportar PDF
-              </Button>
-            )}
-          </div>
+    <NetworkStatusHandler onOffline={() => console.log("Modo offline activado")} onOnline={() => fetchDashboardData()}>
+      <div className="min-h-screen bg-gray-100">
+        <div className="sticky top-0 z-50 w-full">
+          <Navbar />
         </div>
 
-        {/* Filtros de Fecha */}
-        <Card className="mb-4">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center">
-              <Filter className="mr-2 h-4 w-4" />
-              Filtros de Período
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
-              <div className="space-y-1">
-                <Label htmlFor="fechaInicio" className="text-sm flex items-center">
-                  <Calendar className="mr-1 h-3 w-3" />
-                  Fecha Inicio
-                </Label>
-                <Input
-                  id="fechaInicio"
-                  type="date"
-                  value={fechaInicio}
-                  onChange={(e) => setFechaInicio(e.target.value)}
-                  className="border-gray-300 h-8"
-                />
+        <div className="container mx-auto px-3 py-4 pt-16 max-w-4xl">
+          <InstallPrompt />
+          <SyncManagerEnhanced onSync={fetchDashboardData} />
+          <CacheIndicator />
+          <BackgroundSyncEnhanced
+            syncTag="dashboard-sync"
+            onSyncRegistered={() => console.log("Sync registrado para dashboard")}
+            onSyncError={(error) => console.error("Error en Background Sync:", error)}
+          />
+
+          {/* Header */}
+          <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3 mb-4">
+            <div className="flex items-center gap-4">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-800">Dashboard Ejecutivo</h1>
+                <p className="text-gray-600 text-sm">Distribuidora de Agua Los Pinos</p>
               </div>
-              <div className="space-y-1">
-                <Label htmlFor="fechaFin" className="text-sm flex items-center">
-                  <Calendar className="mr-1 h-3 w-3" />
-                  Fecha Fin
-                </Label>
-                <Input
-                  id="fechaFin"
-                  type="date"
-                  value={fechaFin}
-                  onChange={(e) => setFechaFin(e.target.value)}
-                  className="border-gray-300 h-8"
-                />
-              </div>
-              <Button
-                onClick={handleApplyFilters}
-                disabled={!fechaInicio || !fechaFin || loading}
-                className="bg-blue-600 hover:bg-blue-700 h-8"
-                size="sm"
-              >
-                {loading ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <Filter className="mr-2 h-3 w-3" />}
-                Aplicar Filtros
-              </Button>
-              <Button
-                onClick={handleResetToCurrentMonth}
-                variant="outline"
-                disabled={loading}
-                size="sm"
-                className="h-8"
-              >
-                <RefreshCw className="mr-2 h-3 w-3" />
-                Mes Actual
-              </Button>
+              <OfflineIndicator />
             </div>
-            <div className="mt-2 text-xs text-gray-600">
-              Período seleccionado:{" "}
-              {parametros?.fechaInicio ? formatDate(parametros.fechaInicio) : formatDate(fechaInicio)} -{" "}
-              {parametros?.fechaFin ? formatDate(parametros.fechaFin) : formatDate(fechaFin)}
+            <div className="flex flex-wrap gap-2">
+              {dashboardData && (
+                <Button onClick={exportDashboardToPDF} className="bg-slate-900 hover:bg-slate-950" size="sm">
+                  <Download className="mr-2 h-4 w-4" />
+                  Exportar PDF
+                </Button>
+              )}
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Estadísticas Principales */}
-        {estadisticasGenerales && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-            {/* Total Cargas */}
-            <Card className="border-l-4 border-l-blue-500">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
-                <CardTitle className="text-sm font-medium">Total Cargas</CardTitle>
-                <Truck className="h-4 w-4 text-blue-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-xl font-bold">{estadisticasGenerales.cargas?.totalCargas || 0}</div>
-                <div className="flex items-center text-xs text-gray-600 mt-1">
-                  <span className="text-blue-600 font-medium">Período seleccionado</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Ingresos Totales */}
-            <Card className="border-l-4 border-l-green-500">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
-                <CardTitle className="text-sm font-medium">Ingresos Totales</CardTitle>
-                <DollarSign className="h-4 w-4 text-green-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-xl font-bold">
-                  {formatCurrency(estadisticasGenerales.cargas?.montoPagado || 0)}
-                </div>
-                <div className="flex items-center text-xs text-gray-600 mt-1">
-                  <span className="text-green-600 font-medium">Pagos recibidos</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Deudas Pendientes */}
-            <Card className="border-l-4 border-l-red-500">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
-                <CardTitle className="text-sm font-medium">Deudas Pendientes</CardTitle>
-                <AlertTriangle className="h-4 w-4 text-red-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-xl font-bold">
-                  {formatCurrency(estadisticasGenerales.cargas?.montoEnDeuda || 0)}
-                </div>
-                <div className="flex items-center text-xs text-gray-600 mt-1">
-                  <span className="text-red-600 font-medium">
-                    {estadisticasGenerales.cargas?.cargasEnDeuda || 0} cargas
-                  </span>
-                  <span className="ml-1">pendientes</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Precio Actual */}
-            <Card className="border-l-4 border-l-purple-500">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
-                <CardTitle className="text-sm font-medium">Precio Actual</CardTitle>
-                <CreditCard className="h-4 w-4 text-purple-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-xl font-bold">{formatCurrency(estadisticasGenerales.precioActual || 0)}</div>
-                <div className="flex items-center text-xs text-gray-600 mt-1">
-                  <span className="text-purple-600 font-medium">por carga</span>
-                </div>
-              </CardContent>
-            </Card>
           </div>
-        )}
 
-        {/* Gráfico de Cargas por Día */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-          {/* Cargas por Día */}
-          <Card className="lg:col-span-2">
+          {/* Indicador de datos en caché */}
+          {usingCachedData && (
+            <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4 flex items-center">
+              <span className="text-sm">
+                Estás viendo datos almacenados localmente. Algunos cambios podrían no estar sincronizados.
+              </span>
+            </div>
+          )}
+
+          {/* Filtros de Fecha */}
+          <Card className="mb-4">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center">
-                <BarChart3 className="mr-2 h-4 w-4" />
-                Cargas por Día (Período Seleccionado)
+                <Filter className="mr-2 h-4 w-4" />
+                Filtros de Período
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {cargasPorDia && cargasPorDia.length > 0 ? (
-                <div className="space-y-2">
-                  {cargasPorDia.map((dia, index) => {
-                    const maxCargas = Math.max(...cargasPorDia.map((d) => Number(d.totalCargas || 0)))
-                    const totalCargas = Number(dia.totalCargas || 0)
-                    const percentage = maxCargas > 0 ? (totalCargas / maxCargas) * 100 : 0
-
-                    return (
-                      <div key={index} className="flex items-center space-x-3 text-sm">
-                        <div className="w-16 font-medium">{formatDate(dia.fecha)}</div>
-                        <div className="flex-1">
-                          <Progress value={percentage} className="h-2" />
-                        </div>
-                        <div className="w-8 text-right">{totalCargas}</div>
-                        <div className="w-20 text-right text-xs">{formatCurrency(dia.montoTotal || 0)}</div>
-                      </div>
-                    )
-                  })}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+                <div className="space-y-1">
+                  <Label htmlFor="fechaInicio" className="text-sm flex items-center">
+                    <Calendar className="mr-1 h-3 w-3" />
+                    Fecha Inicio
+                  </Label>
+                  <Input
+                    id="fechaInicio"
+                    type="date"
+                    value={fechaInicio}
+                    onChange={(e) => setFechaInicio(e.target.value)}
+                    className="border-gray-300 h-8"
+                  />
                 </div>
-              ) : (
-                <p className="text-gray-500 text-center py-6 text-sm">
-                  No hay datos disponibles para el período seleccionado
-                </p>
-              )}
+                <div className="space-y-1">
+                  <Label htmlFor="fechaFin" className="text-sm flex items-center">
+                    <Calendar className="mr-1 h-3 w-3" />
+                    Fecha Fin
+                  </Label>
+                  <Input
+                    id="fechaFin"
+                    type="date"
+                    value={fechaFin}
+                    onChange={(e) => setFechaFin(e.target.value)}
+                    className="border-gray-300 h-8"
+                  />
+                </div>
+                <Button
+                  onClick={handleApplyFilters}
+                  disabled={!fechaInicio || !fechaFin || loading}
+                  className="bg-blue-600 hover:bg-blue-700 h-8"
+                  size="sm"
+                >
+                  {loading ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <Filter className="mr-2 h-3 w-3" />}
+                  Aplicar Filtros
+                </Button>
+                <Button
+                  onClick={handleResetToCurrentMonth}
+                  variant="outline"
+                  disabled={loading}
+                  size="sm"
+                  className="h-8"
+                >
+                  <RefreshCw className="mr-2 h-3 w-3" />
+                  Mes Actual
+                </Button>
+              </div>
+              <div className="mt-2 text-xs text-gray-600">
+                Período seleccionado:{" "}
+                {parametros?.fechaInicio ? formatDate(parametros.fechaInicio) : formatDate(fechaInicio)} -{" "}
+                {parametros?.fechaFin ? formatDate(parametros.fechaFin) : formatDate(fechaFin)}
+              </div>
             </CardContent>
           </Card>
 
-          {/* Estadísticas de Pagos */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center">
-                <Activity className="mr-2 h-4 w-4" />
-                Estadísticas de Pagos
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {estadisticasGenerales?.pagos && (
-                <>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Total Pagos</span>
-                    <span className="font-semibold">{estadisticasGenerales.pagos?.totalPagos || 0}</span>
+          {/* Estadísticas Principales */}
+          {estadisticasGenerales && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+              {/* Total Cargas */}
+              <Card className="border-l-4 border-l-blue-500">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+                  <CardTitle className="text-sm font-medium">Total Cargas</CardTitle>
+                  <Truck className="h-4 w-4 text-blue-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl font-bold">{estadisticasGenerales.cargas?.totalCargas || 0}</div>
+                  <div className="flex items-center text-xs text-gray-600 mt-1">
+                    <span className="text-blue-600 font-medium">Período seleccionado</span>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Pagos Activos</span>
-                    <span className="font-semibold text-green-600">
-                      {estadisticasGenerales.pagos?.pagosActivos || 0}
+                </CardContent>
+              </Card>
+
+              {/* Ingresos Totales */}
+              <Card className="border-l-4 border-l-green-500">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+                  <CardTitle className="text-sm font-medium">Ingresos Totales</CardTitle>
+                  <DollarSign className="h-4 w-4 text-green-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl font-bold">
+                    {formatCurrency(estadisticasGenerales.cargas?.montoPagado || 0)}
+                  </div>
+                  <div className="flex items-center text-xs text-gray-600 mt-1">
+                    <span className="text-green-600 font-medium">Pagos recibidos</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Deudas Pendientes */}
+              <Card className="border-l-4 border-l-red-500">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+                  <CardTitle className="text-sm font-medium">Deudas Pendientes</CardTitle>
+                  <AlertTriangle className="h-4 w-4 text-red-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl font-bold">
+                    {formatCurrency(estadisticasGenerales.cargas?.montoEnDeuda || 0)}
+                  </div>
+                  <div className="flex items-center text-xs text-gray-600 mt-1">
+                    <span className="text-red-600 font-medium">
+                      {estadisticasGenerales.cargas?.cargasEnDeuda || 0} cargas
                     </span>
+                    <span className="ml-1">pendientes</span>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Pagos Anulados</span>
-                    <span className="font-semibold text-red-600">
-                      {estadisticasGenerales.pagos?.pagosAnulados || 0}
-                    </span>
+                </CardContent>
+              </Card>
+
+              {/* Precio Actual */}
+              <Card className="border-l-4 border-l-purple-500">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+                  <CardTitle className="text-sm font-medium">Precio Actual</CardTitle>
+                  <CreditCard className="h-4 w-4 text-purple-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl font-bold">{formatCurrency(estadisticasGenerales.precioActual || 0)}</div>
+                  <div className="flex items-center text-xs text-gray-600 mt-1">
+                    <span className="text-purple-600 font-medium">por carga</span>
                   </div>
-                  <div className="pt-2 border-t">
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Gráfico de Cargas por Día */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+            {/* Cargas por Día */}
+            <Card className="lg:col-span-2">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center">
+                  <BarChart3 className="mr-2 h-4 w-4" />
+                  Cargas por Día (Período Seleccionado)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {cargasPorDia && cargasPorDia.length > 0 ? (
+                  <div className="space-y-2">
+                    {cargasPorDia.map((dia, index) => {
+                      const maxCargas = Math.max(...cargasPorDia.map((d) => Number(d.totalCargas || 0)))
+                      const totalCargas = Number(dia.totalCargas || 0)
+                      const percentage = maxCargas > 0 ? (totalCargas / maxCargas) * 100 : 0
+
+                      return (
+                        <div key={index} className="flex items-center space-x-3 text-sm">
+                          <div className="w-16 font-medium">{formatDate(dia.fecha)}</div>
+                          <div className="flex-1">
+                            <Progress value={percentage} className="h-2" />
+                          </div>
+                          <div className="w-8 text-right">{totalCargas}</div>
+                          <div className="w-20 text-right text-xs">{formatCurrency(dia.montoTotal || 0)}</div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-center py-6 text-sm">
+                    No hay datos disponibles para el período seleccionado
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Estadísticas de Pagos */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center">
+                  <Activity className="mr-2 h-4 w-4" />
+                  Estadísticas de Pagos
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {estadisticasGenerales?.pagos && (
+                  <>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Monto Total</span>
-                      <span className="font-semibold">
-                        {formatCurrency(estadisticasGenerales.pagos?.montoTotal || 0)}
+                      <span className="text-sm text-gray-600">Total Pagos</span>
+                      <span className="font-semibold">{estadisticasGenerales.pagos?.totalPagos || 0}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Pagos Activos</span>
+                      <span className="font-semibold text-green-600">
+                        {estadisticasGenerales.pagos?.pagosActivos || 0}
                       </span>
                     </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Pagos Anulados</span>
+                      <span className="font-semibold text-red-600">
+                        {estadisticasGenerales.pagos?.pagosAnulados || 0}
+                      </span>
+                    </div>
+                    <div className="pt-2 border-t">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Monto Total</span>
+                        <span className="font-semibold">
+                          {formatCurrency(estadisticasGenerales.pagos?.montoTotal || 0)}
+                        </span>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Resumen de Eficiencia */}
+          {estadisticasGenerales?.cargas && (
+            <Card className="mt-4">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center">
+                  <PieChart className="mr-2 h-4 w-4" />
+                  Resumen de Eficiencia
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Tasa de Cobro */}
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-green-600 mb-1">
+                      {Number(estadisticasGenerales.cargas.totalCargas) > 0
+                        ? (
+                            (Number(estadisticasGenerales.cargas.cargasPagadas) /
+                              Number(estadisticasGenerales.cargas.totalCargas)) *
+                            100
+                          ).toFixed(1)
+                        : 0}
+                      %
+                    </div>
+                    <div className="text-sm text-gray-600 mb-2">Tasa de Cobro</div>
+                    <Progress
+                      value={
+                        Number(estadisticasGenerales.cargas.totalCargas) > 0
+                          ? (Number(estadisticasGenerales.cargas.cargasPagadas) /
+                              Number(estadisticasGenerales.cargas.totalCargas)) *
+                            100
+                          : 0
+                      }
+                      className="h-2"
+                    />
                   </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
+
+                  {/* Eficiencia de Ingresos */}
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-blue-600 mb-1">
+                      {Number(estadisticasGenerales.cargas.montoTotal) > 0
+                        ? (
+                            (Number(estadisticasGenerales.cargas.montoPagado) /
+                              Number(estadisticasGenerales.cargas.montoTotal)) *
+                            100
+                          ).toFixed(1)
+                        : 0}
+                      %
+                    </div>
+                    <div className="text-sm text-gray-600 mb-2">Eficiencia de Ingresos</div>
+                    <Progress
+                      value={
+                        Number(estadisticasGenerales.cargas.montoTotal) > 0
+                          ? (Number(estadisticasGenerales.cargas.montoPagado) /
+                              Number(estadisticasGenerales.cargas.montoTotal)) *
+                            100
+                          : 0
+                      }
+                      className="h-2"
+                    />
+                  </div>
+
+                  {/* Promedio por Carga */}
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-purple-600 mb-1">
+                      {formatCurrency(
+                        Number(estadisticasGenerales.cargas.totalCargas) > 0
+                          ? Number(estadisticasGenerales.cargas.montoTotal) /
+                              Number(estadisticasGenerales.cargas.totalCargas)
+                          : 0,
+                      )}
+                    </div>
+                    <div className="text-sm text-gray-600 mb-2">Promedio por Carga</div>
+                    <div className="text-xs text-gray-500">
+                      Precio actual: {formatCurrency(estadisticasGenerales.precioActual)}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
-
-        {/* Resumen de Eficiencia */}
-        {estadisticasGenerales?.cargas && (
-          <Card className="mt-4">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center">
-                <PieChart className="mr-2 h-4 w-4" />
-                Resumen de Eficiencia
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Tasa de Cobro */}
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600 mb-1">
-                    {Number(estadisticasGenerales.cargas.totalCargas) > 0
-                      ? (
-                          (Number(estadisticasGenerales.cargas.cargasPagadas) /
-                            Number(estadisticasGenerales.cargas.totalCargas)) *
-                          100
-                        ).toFixed(1)
-                      : 0}
-                    %
-                  </div>
-                  <div className="text-sm text-gray-600 mb-2">Tasa de Cobro</div>
-                  <Progress
-                    value={
-                      Number(estadisticasGenerales.cargas.totalCargas) > 0
-                        ? (Number(estadisticasGenerales.cargas.cargasPagadas) /
-                            Number(estadisticasGenerales.cargas.totalCargas)) *
-                          100
-                        : 0
-                    }
-                    className="h-2"
-                  />
-                </div>
-
-                {/* Eficiencia de Ingresos */}
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-600 mb-1">
-                    {Number(estadisticasGenerales.cargas.montoTotal) > 0
-                      ? (
-                          (Number(estadisticasGenerales.cargas.montoPagado) /
-                            Number(estadisticasGenerales.cargas.montoTotal)) *
-                          100
-                        ).toFixed(1)
-                      : 0}
-                    %
-                  </div>
-                  <div className="text-sm text-gray-600 mb-2">Eficiencia de Ingresos</div>
-                  <Progress
-                    value={
-                      Number(estadisticasGenerales.cargas.montoTotal) > 0
-                        ? (Number(estadisticasGenerales.cargas.montoPagado) /
-                            Number(estadisticasGenerales.cargas.montoTotal)) *
-                          100
-                        : 0
-                    }
-                    className="h-2"
-                  />
-                </div>
-
-                {/* Promedio por Carga */}
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-purple-600 mb-1">
-                    {formatCurrency(
-                      Number(estadisticasGenerales.cargas.totalCargas) > 0
-                        ? Number(estadisticasGenerales.cargas.montoTotal) /
-                            Number(estadisticasGenerales.cargas.totalCargas)
-                        : 0,
-                    )}
-                  </div>
-                  <div className="text-sm text-gray-600 mb-2">Promedio por Carga</div>
-                  <div className="text-xs text-gray-500">
-                    Precio actual: {formatCurrency(estadisticasGenerales.precioActual)}
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
       </div>
-    </div>
+    </NetworkStatusHandler>
   )
 }

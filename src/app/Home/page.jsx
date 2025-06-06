@@ -14,6 +14,23 @@ import { Separator } from "@/components/components/ui/separator"
 import { Alert, AlertDescription } from "@/components/components/ui/alert"
 import { toast } from "@/components/hooks/use-toast"
 
+// Importar componentes PWA
+import OfflineIndicator from "@/components/pwa-features/offline-indicator"
+import NetworkStatusHandler from "@/components/pwa-features/network-status-handler"
+import InstallPrompt from "@/components/pwa-features/install-prompt"
+import CacheIndicator from "@/components/pwa-features/cache-indicator"
+import SyncManagerEnhanced from "@/components/pwa-features/sync-manager"
+import BackgroundSyncEnhanced from "@/components/pwa-features/background-sync"
+
+// Importar utilidades PWA
+import { usePWAFeatures } from "../../hooks/use-pwa-features"
+import {
+  saveToIndexedDB,
+  getFromIndexedDB,
+  registerSyncRequest,
+  initializeBackgroundSync,
+} from "../../utils/pwa-helpers"
+
 export default function ProfilePage() {
   const [profile, setProfile] = useState({ nombre: "", username: "", correo: "", ci: "", rol: "" })
   const [editMode, setEditMode] = useState(false)
@@ -24,6 +41,13 @@ export default function ProfilePage() {
   const [isSaving, setIsSaving] = useState(false)
 
   const router = useRouter()
+
+  const { isOnline, updatePendingSyncCount } = usePWAFeatures()
+
+  useEffect(() => {
+    // Inicializar background sync
+    initializeBackgroundSync()
+  }, [])
 
   useEffect(() => {
     // Solo ejecutamos este código en el cliente (browser)
@@ -54,6 +78,16 @@ export default function ProfilePage() {
     setError(null)
 
     try {
+      if (!isOnline) {
+        // Cargar desde IndexedDB cuando está offline
+        const cachedData = await getFromIndexedDB("profile", userId)
+        if (cachedData && cachedData.data) {
+          setProfile((prev) => ({ ...cachedData.data, rol: prev.rol }))
+          setIsLoading(false)
+          return
+        }
+      }
+
       const response = await fetch(apiUrl, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -64,13 +98,26 @@ export default function ProfilePage() {
 
       if (response.ok) {
         setProfile((prev) => ({ ...data, rol: prev.rol }))
+        // Guardar en caché
+        await saveToIndexedDB("profile", { id: userId, data, timestamp: Date.now() })
       } else {
         setError("No se pudo cargar el perfil. Por favor, inicie sesión nuevamente.")
         setTimeout(() => router.push("/"), 2000)
       }
     } catch (error) {
       console.error("Error fetching profile:", error)
-      setError("Error de conexión. Verifique su conexión a internet.")
+
+      // Cargar desde caché en caso de error
+      const cachedData = await getFromIndexedDB("profile", userId)
+      if (cachedData && cachedData.data) {
+        setProfile((prev) => ({ ...cachedData.data, rol: prev.rol }))
+        toast({
+          title: "Usando datos en caché",
+          description: "Estás viendo datos almacenados localmente.",
+        })
+      } else {
+        setError("Error de conexión. Verifique su conexión a internet.")
+      }
     } finally {
       setIsLoading(false)
     }
@@ -89,6 +136,23 @@ export default function ProfilePage() {
     setIsSaving(true)
 
     try {
+      if (!isOnline) {
+        // Registrar para sincronización offline
+        await registerSyncRequest(apiUrl, "PUT", profile)
+
+        // Actualizar caché local
+        await saveToIndexedDB("profile", { id: userId, data: profile, timestamp: Date.now() })
+
+        updatePendingSyncCount(true)
+        setEditMode(false)
+        toast({
+          title: "Perfil actualizado",
+          description: "Los cambios se guardarán cuando vuelva la conexión.",
+          duration: 3000,
+        })
+        return
+      }
+
       const response = await fetch(apiUrl, {
         method: "PUT",
         headers: {
@@ -196,247 +260,271 @@ export default function ProfilePage() {
   })
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 py-20 px-4">
-      <div className="max-w-5xl mx-auto">
-        <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-gray-800">Mi Perfil</h1>
-          <p className="text-gray-600 mt-2">Gestiona tu información personal</p>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Columna izquierda - Información de perfil */}
-          <div className="lg:col-span-1">
-            <Card className="shadow-md border-gray-200 overflow-hidden">
-              <div className="bg-gradient-to-r from-blue-600 to-blue-800 h-24 relative"></div>
-              <div className="px-6 pb-6">
-                <div className="flex justify-center -mt-12">
-                  <Avatar className="h-24 w-24 border-4 border-white shadow-lg">
-                    <AvatarFallback className="bg-blue-100 text-blue-800 text-xl">
-                      {getInitials(profile.nombre)}
-                    </AvatarFallback>
-                  </Avatar>
-                </div>
-                <div className="text-center mt-4">
-                  <h2 className="text-xl font-bold text-gray-800">{profile.nombre}</h2>
-                  <p className="text-gray-500">@{profile.username}</p>
-                  <div className="mt-2">
-                    <Badge className={`${getRoleColor(profile.rol)}`}>{getRoleLabel(profile.rol)}</Badge>
-                  </div>
-                </div>
-
-                <Separator className="my-4" />
-
-                <div className="space-y-3">
-                  <div className="flex items-center text-gray-600">
-                    <Mail className="h-4 w-4 mr-2" />
-                    <span className="text-sm">{profile.correo}</span>
-                  </div>
-                  <div className="flex items-center text-gray-600">
-                    <CreditCard className="h-4 w-4 mr-2" />
-                    <span className="text-sm">CI: {profile.ci || "No especificado"}</span>
-                  </div>
-                  <div className="flex items-center text-gray-600">
-                    <Clock className="h-4 w-4 mr-2" />
-                    <span className="text-sm">Último acceso: {lastLogin}</span>
-                  </div>
-                </div>
-              </div>
-            </Card>
-
-            <Card className="shadow-md border-gray-200 mt-6">
-              <CardHeader>
-                <CardTitle className="text-lg">Información de Cuenta</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center text-gray-600">
-                      <Shield className="h-4 w-4 mr-2" />
-                      <span className="text-sm">Estado de cuenta</span>
-                    </div>
-                    <Badge className="bg-green-100 text-green-800 border-green-200">Activa</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center text-gray-600">
-                      <Calendar className="h-4 w-4 mr-2" />
-                      <span className="text-sm">Miembro desde</span>
-                    </div>
-                    <span className="text-sm text-gray-700">Enero 2023</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+    <NetworkStatusHandler onOffline={() => console.log("Modo offline activado")} onOnline={() => fetchProfile()}>
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 py-20 px-4">
+        <div className="max-w-5xl mx-auto">
+          <div className="mb-8 text-center flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-800">Mi Perfil</h1>
+              <p className="text-gray-600 mt-2">Gestiona tu información personal</p>
+            </div>
+            <OfflineIndicator />
           </div>
 
-          {/* Columna derecha - Edición de perfil y pestañas */}
-          <div className="lg:col-span-2">
-            <Tabs defaultValue="profile" className="w-full">
-              <TabsList className="grid grid-cols-2 mb-6">
-                <TabsTrigger value="profile">Perfil</TabsTrigger>
-                <TabsTrigger value="activity">Actividad</TabsTrigger>
-              </TabsList>
+          <InstallPrompt />
+          <SyncManagerEnhanced onSync={fetchProfile} />
+          <CacheIndicator />
+          <BackgroundSyncEnhanced
+            syncTag="profile-sync"
+            onSyncRegistered={() => console.log("Sync registrado para perfil")}
+            onSyncError={(error) => console.error("Error en Background Sync:", error)}
+          />
 
-              <TabsContent value="profile">
-                <Card className="shadow-md border-gray-200">
-                  <CardHeader>
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <CardTitle>Información Personal</CardTitle>
-                        <CardDescription>Actualiza tus datos personales</CardDescription>
-                      </div>
-                      {!editMode && (
-                        <Button variant="outline" size="sm" onClick={handleEdit}>
-                          <Edit className="h-4 w-4 mr-2" /> Editar
-                        </Button>
-                      )}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Columna izquierda - Información de perfil */}
+            <div className="lg:col-span-1">
+              <Card className="shadow-md border-gray-200 overflow-hidden">
+                <div className="bg-gradient-to-r from-blue-600 to-blue-800 h-24 relative"></div>
+                <div className="px-6 pb-6">
+                  <div className="flex justify-center -mt-12">
+                    <Avatar className="h-24 w-24 border-4 border-white shadow-lg">
+                      <AvatarFallback className="bg-blue-100 text-blue-800 text-xl">
+                        {getInitials(profile.nombre)}
+                      </AvatarFallback>
+                    </Avatar>
+                  </div>
+                  <div className="text-center mt-4">
+                    <h2 className="text-xl font-bold text-gray-800">{profile.nombre}</h2>
+                    <p className="text-gray-500">@{profile.username}</p>
+                    <div className="mt-2">
+                      <Badge className={`${getRoleColor(profile.rol)}`}>{getRoleLabel(profile.rol)}</Badge>
                     </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <label htmlFor="nombre" className="text-sm font-medium text-gray-700">
-                          Nombre Completo
-                        </label>
-                        <div className="relative">
-                          <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 h-4 w-4" />
-                          <Input
-                            id="nombre"
-                            name="nombre"
-                            value={profile.nombre}
-                            onChange={handleChange}
-                            className={`pl-10 ${!editMode ? "bg-gray-50" : ""}`}
-                            placeholder="Tu nombre completo"
-                            readOnly={!editMode}
-                          />
-                        </div>
-                      </div>
+                  </div>
 
-                      <div className="space-y-2">
-                        <label htmlFor="username" className="text-sm font-medium text-gray-700">
-                          Nombre de Usuario
-                        </label>
-                        <div className="relative">
-                          <UserCircle className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 h-4 w-4" />
-                          <Input
-                            id="username"
-                            name="username"
-                            value={profile.username}
-                            onChange={handleChange}
-                            className={`pl-10 ${!editMode ? "bg-gray-50" : ""}`}
-                            placeholder="Tu nombre de usuario"
-                            readOnly={!editMode}
-                          />
-                        </div>
-                      </div>
+                  <Separator className="my-4" />
 
-                      <div className="space-y-2">
-                        <label htmlFor="correo" className="text-sm font-medium text-gray-700">
-                          Correo Electrónico
-                        </label>
-                        <div className="relative">
-                          <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 h-4 w-4" />
-                          <Input
-                            id="correo"
-                            name="correo"
-                            type="email"
-                            value={profile.correo}
-                            onChange={handleChange}
-                            className={`pl-10 ${!editMode ? "bg-gray-50" : ""}`}
-                            placeholder="Tu correo electrónico"
-                            readOnly={!editMode}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label htmlFor="ci" className="text-sm font-medium text-gray-700">
-                          Cédula de Identidad
-                        </label>
-                        <div className="relative">
-                          <CreditCard className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 h-4 w-4" />
-                          <Input
-                            id="ci"
-                            name="ci"
-                            value={profile.ci}
-                            onChange={handleChange}
-                            className={`pl-10 ${!editMode ? "bg-gray-50" : ""}`}
-                            placeholder="Tu cédula de identidad"
-                            readOnly={!editMode}
-                          />
-                        </div>
-                      </div>
+                  <div className="space-y-3">
+                    <div className="flex items-center text-gray-600">
+                      <Mail className="h-4 w-4 mr-2" />
+                      <span className="text-sm">{profile.correo}</span>
                     </div>
-                  </CardContent>
+                    <div className="flex items-center text-gray-600">
+                      <CreditCard className="h-4 w-4 mr-2" />
+                      <span className="text-sm">CI: {profile.ci || "No especificado"}</span>
+                    </div>
+                    <div className="flex items-center text-gray-600">
+                      <Clock className="h-4 w-4 mr-2" />
+                      <span className="text-sm">Último acceso: {lastLogin}</span>
+                    </div>
+                  </div>
+                </div>
+              </Card>
 
-                  {editMode && (
-                    <CardFooter className="flex justify-end space-x-4 pt-4 border-t">
-                      <Button variant="outline" onClick={handleCancel} disabled={isSaving}>
-                        <X className="h-4 w-4 mr-2" /> Cancelar
-                      </Button>
-                      <Button onClick={handleSave} disabled={isSaving}>
-                        {isSaving ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Guardando...
-                          </>
-                        ) : (
-                          <>
-                            <Save className="h-4 w-4 mr-2" /> Guardar Cambios
-                          </>
+              <Card className="shadow-md border-gray-200 mt-6">
+                <CardHeader>
+                  <CardTitle className="text-lg">Información de Cuenta</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center text-gray-600">
+                        <Shield className="h-4 w-4 mr-2" />
+                        <span className="text-sm">Estado de cuenta</span>
+                      </div>
+                      <Badge className="bg-green-100 text-green-800 border-green-200">Activa</Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center text-gray-600">
+                        <Calendar className="h-4 w-4 mr-2" />
+                        <span className="text-sm">Miembro desde</span>
+                      </div>
+                      <span className="text-sm text-gray-700">Enero 2023</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Columna derecha - Edición de perfil y pestañas */}
+            <div className="lg:col-span-2">
+              <Tabs defaultValue="profile" className="w-full">
+                <TabsList className="grid grid-cols-2 mb-6">
+                  <TabsTrigger value="profile">Perfil</TabsTrigger>
+                  <TabsTrigger value="activity">Actividad</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="profile">
+                  <Card className="shadow-md border-gray-200">
+                    <CardHeader>
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <CardTitle>Información Personal</CardTitle>
+                          <CardDescription>Actualiza tus datos personales</CardDescription>
+                        </div>
+                        {!editMode && (
+                          <Button variant="outline" size="sm" onClick={handleEdit}>
+                            <Edit className="h-4 w-4 mr-2" /> Editar
+                          </Button>
                         )}
-                      </Button>
-                    </CardFooter>
-                  )}
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="activity">
-                <Card className="shadow-md border-gray-200">
-                  <CardHeader>
-                    <CardTitle>Actividad Reciente</CardTitle>
-                    <CardDescription>Historial de actividades en el sistema</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-6">
-                      <div className="flex items-start space-x-4">
-                        <div className="bg-blue-100 p-2 rounded-full">
-                          <User className="h-5 w-5 text-blue-600" />
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <label htmlFor="nombre" className="text-sm font-medium text-gray-700">
+                            Nombre Completo
+                          </label>
+                          <div className="relative">
+                            <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 h-4 w-4" />
+                            <Input
+                              id="nombre"
+                              name="nombre"
+                              value={profile.nombre}
+                              onChange={handleChange}
+                              className={`pl-10 ${!editMode ? "bg-gray-50" : ""}`}
+                              placeholder="Tu nombre completo"
+                              readOnly={!editMode}
+                            />
+                          </div>
                         </div>
-                        <div className="flex-1">
-                          <p className="text-sm font-medium">Actualización de perfil</p>
-                          <p className="text-xs text-gray-500">Actualizaste tu información personal</p>
-                          <p className="text-xs text-gray-400 mt-1">Hace 2 días</p>
+
+                        <div className="space-y-2">
+                          <label htmlFor="username" className="text-sm font-medium text-gray-700">
+                            Nombre de Usuario
+                          </label>
+                          <div className="relative">
+                            <UserCircle className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 h-4 w-4" />
+                            <Input
+                              id="username"
+                              name="username"
+                              value={profile.username}
+                              onChange={handleChange}
+                              className={`pl-10 ${!editMode ? "bg-gray-50" : ""}`}
+                              placeholder="Tu nombre de usuario"
+                              readOnly={!editMode}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label htmlFor="correo" className="text-sm font-medium text-gray-700">
+                            Correo Electrónico
+                          </label>
+                          <div className="relative">
+                            <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 h-4 w-4" />
+                            <Input
+                              id="correo"
+                              name="correo"
+                              type="email"
+                              value={profile.correo}
+                              onChange={handleChange}
+                              className={`pl-10 ${!editMode ? "bg-gray-50" : ""}`}
+                              placeholder="Tu correo electrónico"
+                              readOnly={!editMode}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label htmlFor="ci" className="text-sm font-medium text-gray-700">
+                            Cédula de Identidad
+                          </label>
+                          <div className="relative">
+                            <CreditCard className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 h-4 w-4" />
+                            <Input
+                              id="ci"
+                              name="ci"
+                              value={profile.ci}
+                              onChange={handleChange}
+                              className={`pl-10 ${!editMode ? "bg-gray-50" : ""}`}
+                              placeholder="Tu cédula de identidad"
+                              readOnly={!editMode}
+                            />
+                          </div>
                         </div>
                       </div>
+                    </CardContent>
 
-                      <div className="flex items-start space-x-4">
-                        <div className="bg-green-100 p-2 rounded-full">
-                          <Shield className="h-5 w-5 text-green-600" />
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm font-medium">Inicio de sesión exitoso</p>
-                          <p className="text-xs text-gray-500">Accediste a tu cuenta desde un nuevo dispositivo</p>
-                          <p className="text-xs text-gray-400 mt-1">Hace 5 días</p>
+                    {!isOnline && editMode && (
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                        <div className="flex items-center gap-2 text-yellow-800">
+                          <span className="text-sm">
+                            Sin conexión - Los cambios se guardarán para sincronizar después
+                          </span>
                         </div>
                       </div>
+                    )}
 
-                      <div className="flex items-start space-x-4">
-                        <div className="bg-purple-100 p-2 rounded-full">
-                          <Mail className="h-5 w-5 text-purple-600" />
+                    {editMode && (
+                      <CardFooter className="flex justify-end space-x-4 pt-4 border-t">
+                        <Button variant="outline" onClick={handleCancel} disabled={isSaving}>
+                          <X className="h-4 w-4 mr-2" /> Cancelar
+                        </Button>
+                        <Button onClick={handleSave} disabled={isSaving}>
+                          {isSaving ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Guardando...
+                            </>
+                          ) : (
+                            <>
+                              <Save className="h-4 w-4 mr-2" /> Guardar Cambios
+                            </>
+                          )}
+                        </Button>
+                      </CardFooter>
+                    )}
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="activity">
+                  <Card className="shadow-md border-gray-200">
+                    <CardHeader>
+                      <CardTitle>Actividad Reciente</CardTitle>
+                      <CardDescription>Historial de actividades en el sistema</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-6">
+                        <div className="flex items-start space-x-4">
+                          <div className="bg-blue-100 p-2 rounded-full">
+                            <User className="h-5 w-5 text-blue-600" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium">Actualización de perfil</p>
+                            <p className="text-xs text-gray-500">Actualizaste tu información personal</p>
+                            <p className="text-xs text-gray-400 mt-1">Hace 2 días</p>
+                          </div>
                         </div>
-                        <div className="flex-1">
-                          <p className="text-sm font-medium">Correo electrónico verificado</p>
-                          <p className="text-xs text-gray-500">Verificaste tu dirección de correo electrónico</p>
-                          <p className="text-xs text-gray-400 mt-1">Hace 2 semanas</p>
+
+                        <div className="flex items-start space-x-4">
+                          <div className="bg-green-100 p-2 rounded-full">
+                            <Shield className="h-5 w-5 text-green-600" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium">Inicio de sesión exitoso</p>
+                            <p className="text-xs text-gray-500">Accediste a tu cuenta desde un nuevo dispositivo</p>
+                            <p className="text-xs text-gray-400 mt-1">Hace 5 días</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-start space-x-4">
+                          <div className="bg-purple-100 p-2 rounded-full">
+                            <Mail className="h-5 w-5 text-purple-600" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium">Correo electrónico verificado</p>
+                            <p className="text-xs text-gray-500">Verificaste tu dirección de correo electrónico</p>
+                            <p className="text-xs text-gray-400 mt-1">Hace 2 semanas</p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </NetworkStatusHandler>
   )
 }

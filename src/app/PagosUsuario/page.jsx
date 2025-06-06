@@ -24,6 +24,23 @@ import { Label } from "../../components/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/components/ui/tabs"
 import { Checkbox } from "../../components/components/ui/checkbox"
 
+// Importar componentes PWA
+import OfflineIndicator from "@/components/pwa-features/offline-indicator"
+import NetworkStatusHandler from "@/components/pwa-features/network-status-handler"
+import InstallPrompt from "@/components/pwa-features/install-prompt"
+import CacheIndicator from "@/components/pwa-features/cache-indicator"
+import SyncManagerEnhanced from "@/components/pwa-features/sync-manager"
+import BackgroundSyncEnhanced from "@/components/pwa-features/background-sync"
+
+// Importar utilidades PWA
+import { usePWAFeatures } from "../../hooks/use-pwa-features"
+import {
+  saveToIndexedDB,
+  getFromIndexedDB,
+  registerSyncRequest,
+  initializeBackgroundSync,
+} from "../../utils/pwa-helpers"
+
 const useWindowWidth = () => {
   const [windowWidth, setWindowWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 0)
 
@@ -86,11 +103,15 @@ export default function UsuarioDetalles() {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 6
 
+  const { isOnline, updatePendingSyncCount } = usePWAFeatures()
+
   useEffect(() => {
     const role = localStorage.getItem("rol")
     if (role !== "admin") {
       router.push("/")
     } else {
+      // Inicializar background sync
+      initializeBackgroundSync()
       fetchUsuarios()
 
       const selectedUserId = localStorage.getItem("selectedUserId")
@@ -118,6 +139,15 @@ export default function UsuarioDetalles() {
 
   const fetchUsuarios = async () => {
     try {
+      if (!isOnline) {
+        const cachedData = await getFromIndexedDB("cache", "usuarios")
+        if (cachedData) {
+          const filteredUsers = cachedData.data.filter((user) => user.rol === "propietario" || user.rol === "conductor")
+          setUsuarios(filteredUsers)
+          return
+        }
+      }
+
       const response = await fetch("https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/usuarios", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
@@ -125,9 +155,19 @@ export default function UsuarioDetalles() {
         const data = await response.json()
         const filteredUsers = data.filter((user) => user.rol === "propietario" || user.rol === "conductor")
         setUsuarios(filteredUsers)
+
+        // Guardar en caché
+        await saveToIndexedDB("cache", { id: "usuarios", data, timestamp: Date.now() })
       }
     } catch (error) {
       console.error("Error al obtener usuarios:", error)
+
+      // Cargar desde caché en caso de error
+      const cachedData = await getFromIndexedDB("cache", "usuarios")
+      if (cachedData) {
+        const filteredUsers = cachedData.data.filter((user) => user.rol === "propietario" || user.rol === "conductor")
+        setUsuarios(filteredUsers)
+      }
     }
   }
 
@@ -227,9 +267,12 @@ export default function UsuarioDetalles() {
         )
 
         for (const conductor of conductoresFiltrados) {
-          const responseConductor = await fetch(`https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/cargascliente/${conductor.id}`, {
-            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-          })
+          const responseConductor = await fetch(
+            `https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/cargascliente/${conductor.id}`,
+            {
+              headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+            },
+          )
 
           if (responseConductor.ok) {
             const cargasConductor = await responseConductor.json()
@@ -537,6 +580,51 @@ export default function UsuarioDetalles() {
     }
 
     try {
+      if (!isOnline) {
+        // Registrar para sincronización offline
+        await registerSyncRequest(
+          "https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/pagoscargagua",
+          "POST",
+          datosPago,
+        )
+
+        // Simular resultado del pago para generar recibo
+        const resultado = { id: `temp_${Date.now()}` }
+
+        // Preparar datos del recibo
+        const datosRecibo = {
+          numeroRecibo: generarNumeroRecibo(resultado.id, usuarioSeleccionado.ci),
+          fechaHora: new Date().toLocaleString(),
+          cliente:
+            activeTab === "conductores" && conductorSeleccionado
+              ? conductorSeleccionado.nombre
+              : usuarioSeleccionado.nombre,
+          tipoCliente: activeTab === "conductores" && conductorSeleccionado ? "Conductor" : usuarioSeleccionado.rol,
+          numeroCargas: numeroCargasAPagar,
+          montoTotal: montoCalculado,
+          cargasDetalle: cargasAPagar,
+          pagoId: resultado.id,
+        }
+
+        setPagoRealizado(datosRecibo)
+        setShowPaymentDialog(false)
+        setShowReceiptDialog(true)
+
+        updatePendingSyncCount(true)
+
+        Swal.fire({
+          icon: "success",
+          title: "Pago registrado",
+          text: "El pago se procesará cuando vuelva la conexión",
+          timer: 3000,
+          showConfirmButton: false,
+        })
+
+        setNumeroCargasAPagar(1)
+        setMontoTotal(0)
+        return
+      }
+
       const response = await fetch("https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/pagoscargagua", {
         method: "POST",
         headers: {
@@ -653,245 +741,344 @@ export default function UsuarioDetalles() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 mt-16 max-w-5xl">
-      <h1 className="text-2xl font-bold mb-6">Pago por usuario</h1>
+    <NetworkStatusHandler onOffline={() => console.log("Modo offline activado")} onOnline={() => fetchUsuarios()}>
+      <div className="container mx-auto px-4 py-8 mt-16 max-w-5xl">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold">Pago por usuario</h1>
+          <OfflineIndicator />
+        </div>
 
-      <>
-        <Card className="mb-6 shadow-md border-2 border-gray-300 rounded-lg">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Información del Usuario</CardTitle>
-            <Button variant="outline" onClick={handleCambiarUsuario}>
-              Cambiar Usuario
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col lg:flex-row gap-4">
-              <div className="lg:w-1/2">
-                <div className="flex items-start gap-3">
-                  <Avatar className="h-20 w-20">
-                    <AvatarImage src="/placeholder.svg?height=80&width=80" alt={usuarioSeleccionado?.nombre} />
-                    <AvatarFallback className="text-xl bg-gray-100">
-                      {getInitials(usuarioSeleccionado?.nombre)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <div className="mb-3">
-                      <h3 className="text-sm font-medium text-gray-500">Nombre</h3>
-                      <p className="text-base">{usuarioSeleccionado?.nombre}</p>
+        <InstallPrompt />
+        <SyncManagerEnhanced
+          onSync={() => {
+            fetchUsuarios()
+            if (usuarioSeleccionado) {
+              if (activeTab === "conductores" && conductorSeleccionado) {
+                fetchCargasUsuario(conductorSeleccionado.id, false)
+              } else {
+                fetchCargasUsuario(usuarioSeleccionado.id)
+              }
+            }
+          }}
+        />
+        <CacheIndicator />
+        <BackgroundSyncEnhanced
+          syncTag="usuario-detalles-sync"
+          onSyncRegistered={() => console.log("Sync registrado para usuario detalles")}
+          onSyncError={(error) => console.error("Error en Background Sync:", error)}
+        />
+
+        <>
+          <Card className="mb-6 shadow-md border-2 border-gray-300 rounded-lg">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Información del Usuario</CardTitle>
+              <Button variant="outline" onClick={handleCambiarUsuario}>
+                Cambiar Usuario
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col lg:flex-row gap-4">
+                <div className="lg:w-1/2">
+                  <div className="flex items-start gap-3">
+                    <Avatar className="h-20 w-20">
+                      <AvatarImage src="/placeholder.svg?height=80&width=80" alt={usuarioSeleccionado?.nombre} />
+                      <AvatarFallback className="text-xl bg-gray-100">
+                        {getInitials(usuarioSeleccionado?.nombre)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <div className="mb-3">
+                        <h3 className="text-sm font-medium text-gray-500">Nombre</h3>
+                        <p className="text-base">{usuarioSeleccionado?.nombre}</p>
+                      </div>
+                      <div className="mb-3">
+                        <h3 className="text-sm font-medium text-gray-500">Correo</h3>
+                        <p className="text-base">{usuarioSeleccionado?.correo || "No disponible"}</p>
+                      </div>
+                      <div className="mb-3">
+                        <h3 className="text-sm font-medium text-gray-500">CI</h3>
+                        <p className="text-base">{usuarioSeleccionado?.ci || "No disponible"}</p>
+                      </div>
+                      <Badge className="mt-1">{usuarioSeleccionado?.rol}</Badge>
                     </div>
-                    <div className="mb-3">
-                      <h3 className="text-sm font-medium text-gray-500">Correo</h3>
-                      <p className="text-base">{usuarioSeleccionado?.correo || "No disponible"}</p>
+                  </div>
+                </div>
+
+                <div className="lg:w-1/2">
+                  <div className="grid grid-cols-1 gap-3">
+                    <div className="bg-white p-3 rounded-lg shadow-sm border-2 border-gray-200">
+                      <h4 className="text-sm font-medium text-gray-500">Total de Cargas</h4>
+                      <div className="flex items-center mt-2">
+                        <Calendar className="h-5 w-5 mr-2 text-gray-900" />
+                        <span className="text-xl font-bold">{totalCargas}</span>
+                      </div>
                     </div>
-                    <div className="mb-3">
-                      <h3 className="text-sm font-medium text-gray-500">CI</h3>
-                      <p className="text-base">{usuarioSeleccionado?.ci || "No disponible"}</p>
+
+                    <div className="bg-white p-3 rounded-lg shadow-sm border-2 border-gray-200">
+                      <h4 className="text-sm font-medium text-gray-500">Cargas con Deuda</h4>
+                      <div className="flex items-center mt-2">
+                        <CreditCard className="h-5 w-5 mr-2 text-amber-600" />
+                        <span className="text-xl font-bold">{cargasDeuda.length}</span>
+                      </div>
                     </div>
-                    <Badge className="mt-1">{usuarioSeleccionado?.rol}</Badge>
+
+                    <div className="bg-white p-3 rounded-lg shadow-sm border-2 border-gray-200">
+                      <h4 className="text-sm font-medium text-gray-500">Total Deuda</h4>
+                      <div className="flex items-center mt-2">
+                        <DollarSign className="h-5 w-5 mr-2 text-red-600" />
+                        <span className="text-xl font-bold">Bs{totalDeuda}</span>
+                      </div>
+                      <Button
+                        className="w-full mt-3 bg-gray-900 hover:bg-gray-800 text-white"
+                        onClick={() => {
+                          setNumeroCargasAPagar(Math.min(cargasDeuda.length, 1))
+                          setMontoTotal(cargasDeuda.length > 0 ? cargasDeuda[0].costo || 30 : 0)
+                          setShowPaymentDialog(true)
+                        }}
+                        disabled={cargasDeuda.length === 0}
+                      >
+                        Pagar Deudas
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
+            </CardContent>
+          </Card>
 
-              <div className="lg:w-1/2">
-                <div className="grid grid-cols-1 gap-3">
-                  <div className="bg-white p-3 rounded-lg shadow-sm border-2 border-gray-200">
-                    <h4 className="text-sm font-medium text-gray-500">Total de Cargas</h4>
-                    <div className="flex items-center mt-2">
-                      <Calendar className="h-5 w-5 mr-2 text-gray-900" />
-                      <span className="text-xl font-bold">{totalCargas}</span>
-                    </div>
-                  </div>
+          {usuarioSeleccionado?.rol === "propietario" && (
+            <Tabs value={activeTab} onValueChange={handleTabChange} className="mb-6">
+              <TabsList className="grid w-full grid-cols-2 border-2 border-gray-300">
+                <TabsTrigger value="propietario">Cargas del Propietario</TabsTrigger>
+                <TabsTrigger value="conductores">Cargas de Conductores</TabsTrigger>
+              </TabsList>
 
-                  <div className="bg-white p-3 rounded-lg shadow-sm border-2 border-gray-200">
-                    <h4 className="text-sm font-medium text-gray-500">Cargas con Deuda</h4>
-                    <div className="flex items-center mt-2">
-                      <CreditCard className="h-5 w-5 mr-2 text-amber-600" />
-                      <span className="text-xl font-bold">{cargasDeuda.length}</span>
-                    </div>
-                  </div>
+              <TabsContent value="propietario">
+                {/* Contenido vacío ya que el resumen ahora está en la tarjeta de información del usuario */}
+              </TabsContent>
 
-                  <div className="bg-white p-3 rounded-lg shadow-sm border-2 border-gray-200">
-                    <h4 className="text-sm font-medium text-gray-500">Total Deuda</h4>
-                    <div className="flex items-center mt-2">
-                      <DollarSign className="h-5 w-5 mr-2 text-red-600" />
-                      <span className="text-xl font-bold">Bs{totalDeuda}</span>
-                    </div>
-                    <Button
-                      className="w-full mt-3 bg-gray-900 hover:bg-gray-800 text-white"
-                      onClick={() => {
-                        setNumeroCargasAPagar(Math.min(cargasDeuda.length, 1))
-                        setMontoTotal(cargasDeuda.length > 0 ? cargasDeuda[0].costo || 30 : 0)
-                        setShowPaymentDialog(true)
-                      }}
-                      disabled={cargasDeuda.length === 0}
+              <TabsContent value="conductores">
+                <Card className="mb-6 shadow-md border-2 border-gray-300 rounded-lg">
+                  <CardHeader>
+                    <CardTitle>Seleccionar Conductor</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {conductores.length === 0 ? (
+                      <p className="text-center py-4 text-gray-500">No hay conductores asociados a este propietario.</p>
+                    ) : (
+                      <Select onValueChange={handleConductorChange} value={conductorSeleccionado?.id?.toString()}>
+                        <SelectTrigger className="border-2 border-gray-300">
+                          <SelectValue placeholder="Seleccione un conductor" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {conductores.map((conductor) => (
+                            <SelectItem key={conductor.id} value={conductor.id.toString()}>
+                              {conductor.nombre}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {conductorSeleccionado && (
+                  <Card className="shadow-md mb-6 border-2 border-gray-300 rounded-lg">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-lg">Resumen de Cargas - {conductorSeleccionado.nombre}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div className="bg-white p-3 rounded-lg shadow-sm border-2 border-gray-200">
+                          <h4 className="text-sm font-medium text-gray-500">Total de Cargas</h4>
+                          <div className="flex items-center mt-2">
+                            <Calendar className="h-5 w-5 mr-2 text-gray-900" />
+                            <span className="text-xl font-bold">{totalCargas}</span>
+                          </div>
+                        </div>
+
+                        <div className="bg-white p-3 rounded-lg shadow-sm border-2 border-gray-200">
+                          <h4 className="text-sm font-medium text-gray-500">Cargas con Deuda</h4>
+                          <div className="flex items-center mt-2">
+                            <CreditCard className="h-5 w-5 mr-2 text-amber-600" />
+                            <span className="text-xl font-bold">{cargasDeuda.length}</span>
+                          </div>
+                        </div>
+
+                        <div className="bg-white p-3 rounded-lg shadow-sm border-2 border-gray-200">
+                          <h4 className="text-sm font-medium text-gray-500">Total Deuda</h4>
+                          <div className="flex items-center mt-2">
+                            <DollarSign className="h-5 w-5 mr-2 text-red-600" />
+                            <span className="text-xl font-bold">Bs{totalDeuda}</span>
+                          </div>
+                          <Button
+                            className="w-full mt-3 bg-gray-900 hover:bg-gray-800 text-white"
+                            onClick={() => {
+                              setNumeroCargasAPagar(Math.min(cargasDeuda.length, 1))
+                              setMontoTotal(cargasDeuda.length > 0 ? cargasDeuda[0].costo || 30 : 0)
+                              setShowPaymentDialog(true)
+                            }}
+                            disabled={cargasDeuda.length === 0}
+                          >
+                            Pagar Deudas
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </TabsContent>
+            </Tabs>
+          )}
+
+          <Card className="mb-6 shadow-md border-2 border-gray-300 rounded-lg">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>
+                {usuarioSeleccionado?.rol === "propietario" && activeTab === "conductores" && conductorSeleccionado
+                  ? `Historial de Cargas - ${conductorSeleccionado.nombre}`
+                  : usuarioSeleccionado?.rol === "propietario" && activeTab === "propietario"
+                    ? "Historial de Cargas (Propietario + Conductores)"
+                    : "Historial de Cargas"}
+              </CardTitle>
+              <Button variant="outline" onClick={() => setShowFilterDialog(true)}>
+                <Filter className="h-4 w-4 mr-2" /> {filtrosActivos ? "Filtros Activos" : "Filtros"}
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {cargasFiltradas.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  No hay cargas para mostrar con los filtros seleccionados.
+                </div>
+              ) : isMobile ? (
+                <div className="space-y-4">
+                  {paginatedCargas.map((carga) => (
+                    <Card
+                      key={carga.id}
+                      className="shadow-sm hover:shadow-md transition-shadow duration-200 border-2 border-gray-200"
                     >
-                      Pagar Deudas
+                      <CardContent className="p-4">
+                        <p>
+                          <strong>Fecha y Hora:</strong>{" "}
+                          {new Date(carga.fechaHora).toLocaleDateString("es-ES", {
+                            weekday: "long",
+                            day: "numeric",
+                            month: "long",
+                            year: "numeric",
+                          })}{" "}
+                          {new Date(carga.fechaHora).toLocaleTimeString("es-ES")}
+                        </p>
+                        <p>
+                          <strong>Estado:</strong>{" "}
+                          <Badge className={carga.estado === "deuda" ? "bg-red-500" : "bg-green-500"}>
+                            {carga.estado}
+                          </Badge>
+                        </p>
+                        <p>
+                          <strong>Costo:</strong> Bs{carga.costo || 30}
+                        </p>
+                        <p>
+                          <strong>Usuario:</strong>{" "}
+                          {carga.usuario?.nombre || carga.usuario?.username || carga.conductorNombre || "N/A"}
+                        </p>
+                        <p>
+                          <strong>Tipo:</strong>{" "}
+                          <Badge
+                            variant="outline"
+                            className={carga.tipoCuenta === "propietario" ? "bg-blue-100" : "bg-green-100"}
+                          >
+                            {carga.tipoCuenta === "propietario" ? "Propietario" : "Conductor"}
+                          </Badge>
+                        </p>
+                      </CardContent>
+                      <CardFooter className="flex justify-between">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => fetchChargeDetails(carga.id)}
+                          className="bg-gray-900 hover:bg-gray-800 text-white border-gray-700"
+                        >
+                          Ver Detalles
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  ))}
+
+                  <div className="flex justify-between items-center mt-4">
+                    <Button
+                      onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                      variant="outline"
+                      className="border-2 border-gray-300"
+                    >
+                      <ChevronLeft className="mr-2 h-4 w-4" /> Anterior
+                    </Button>
+                    <span>
+                      Página {currentPage} de {totalPages || 1}
+                    </span>
+                    <Button
+                      onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages || totalPages === 0}
+                      variant="outline"
+                      className="border-2 border-gray-300"
+                    >
+                      Siguiente <ChevronRight className="ml-2 h-4 w-4" />
                     </Button>
                   </div>
                 </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {usuarioSeleccionado?.rol === "propietario" && (
-          <Tabs value={activeTab} onValueChange={handleTabChange} className="mb-6">
-            <TabsList className="grid w-full grid-cols-2 border-2 border-gray-300">
-              <TabsTrigger value="propietario">Cargas del Propietario</TabsTrigger>
-              <TabsTrigger value="conductores">Cargas de Conductores</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="propietario">
-              {/* Contenido vacío ya que el resumen ahora está en la tarjeta de información del usuario */}
-            </TabsContent>
-
-            <TabsContent value="conductores">
-              <Card className="mb-6 shadow-md border-2 border-gray-300 rounded-lg">
-                <CardHeader>
-                  <CardTitle>Seleccionar Conductor</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {conductores.length === 0 ? (
-                    <p className="text-center py-4 text-gray-500">No hay conductores asociados a este propietario.</p>
-                  ) : (
-                    <Select onValueChange={handleConductorChange} value={conductorSeleccionado?.id?.toString()}>
-                      <SelectTrigger className="border-2 border-gray-300">
-                        <SelectValue placeholder="Seleccione un conductor" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {conductores.map((conductor) => (
-                          <SelectItem key={conductor.id} value={conductor.id.toString()}>
-                            {conductor.nombre}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                </CardContent>
-              </Card>
-
-              {conductorSeleccionado && (
-                <Card className="shadow-md mb-6 border-2 border-gray-300 rounded-lg">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg">Resumen de Cargas - {conductorSeleccionado.nombre}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      <div className="bg-white p-3 rounded-lg shadow-sm border-2 border-gray-200">
-                        <h4 className="text-sm font-medium text-gray-500">Total de Cargas</h4>
-                        <div className="flex items-center mt-2">
-                          <Calendar className="h-5 w-5 mr-2 text-gray-900" />
-                          <span className="text-xl font-bold">{totalCargas}</span>
-                        </div>
-                      </div>
-
-                      <div className="bg-white p-3 rounded-lg shadow-sm border-2 border-gray-200">
-                        <h4 className="text-sm font-medium text-gray-500">Cargas con Deuda</h4>
-                        <div className="flex items-center mt-2">
-                          <CreditCard className="h-5 w-5 mr-2 text-amber-600" />
-                          <span className="text-xl font-bold">{cargasDeuda.length}</span>
-                        </div>
-                      </div>
-
-                      <div className="bg-white p-3 rounded-lg shadow-sm border-2 border-gray-200">
-                        <h4 className="text-sm font-medium text-gray-500">Total Deuda</h4>
-                        <div className="flex items-center mt-2">
-                          <DollarSign className="h-5 w-5 mr-2 text-red-600" />
-                          <span className="text-xl font-bold">Bs{totalDeuda}</span>
-                        </div>
-                        <Button
-                          className="w-full mt-3 bg-gray-900 hover:bg-gray-800 text-white"
-                          onClick={() => {
-                            setNumeroCargasAPagar(Math.min(cargasDeuda.length, 1))
-                            setMontoTotal(cargasDeuda.length > 0 ? cargasDeuda[0].costo || 30 : 0)
-                            setShowPaymentDialog(true)
-                          }}
-                          disabled={cargasDeuda.length === 0}
-                        >
-                          Pagar Deudas
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+              ) : (
+                <div className="border-[3px] border-gray-600 rounded-lg overflow-hidden shadow-xl">
+                  <Table className="w-full border-collapse">
+                    <TableHeader className="bg-gray-700">
+                      <TableRow className="border-b-0">
+                        <TableHead className="font-bold text-white py-4 border-0">Fecha y Hora</TableHead>
+                        <TableHead className="font-bold text-white py-4 border-0">Estado</TableHead>
+                        <TableHead className="font-bold text-white py-4 border-0">Costo</TableHead>
+                        <TableHead className="font-bold text-white py-4 border-0">Usuario</TableHead>
+                        <TableHead className="font-bold text-white py-4 border-0">Acciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedCargas.map((carga) => (
+                        <TableRow key={carga.id} className="border-0 hover:bg-gray-50">
+                          <TableCell className="border-0 py-3">
+                            {new Date(carga.fechaHora).toLocaleDateString("es-ES", {
+                              weekday: "long",
+                              day: "numeric",
+                              month: "long",
+                              year: "numeric",
+                            })}{" "}
+                            {new Date(carga.fechaHora).toLocaleTimeString("es-ES")}
+                          </TableCell>
+                          <TableCell className="border-0 py-3">
+                            <Badge className={carga.estado === "deuda" ? "bg-red-500" : "bg-green-500"}>
+                              {carga.estado}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="border-0 py-3">Bs{carga.costo || 30}</TableCell>
+                          <TableCell className="border-0 py-3">
+                            {carga.usuario?.nombre || carga.usuario?.username || carga.conductorNombre || "N/A"}
+                          </TableCell>
+                          <TableCell className="border-0 py-3">
+                            <div className="flex space-x-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => fetchChargeDetails(carga.id)}
+                                className="bg-gray-900 hover:bg-gray-800 text-white border-gray-700"
+                              >
+                                Ver Detalles
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               )}
-            </TabsContent>
-          </Tabs>
-        )}
 
-        <Card className="mb-6 shadow-md border-2 border-gray-300 rounded-lg">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>
-              {usuarioSeleccionado?.rol === "propietario" && activeTab === "conductores" && conductorSeleccionado
-                ? `Historial de Cargas - ${conductorSeleccionado.nombre}`
-                : usuarioSeleccionado?.rol === "propietario" && activeTab === "propietario"
-                  ? "Historial de Cargas (Propietario + Conductores)"
-                  : "Historial de Cargas"}
-            </CardTitle>
-            <Button variant="outline" onClick={() => setShowFilterDialog(true)}>
-              <Filter className="h-4 w-4 mr-2" /> {filtrosActivos ? "Filtros Activos" : "Filtros"}
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {cargasFiltradas.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                No hay cargas para mostrar con los filtros seleccionados.
-              </div>
-            ) : isMobile ? (
-              <div className="space-y-4">
-                {paginatedCargas.map((carga) => (
-                  <Card
-                    key={carga.id}
-                    className="shadow-sm hover:shadow-md transition-shadow duration-200 border-2 border-gray-200"
-                  >
-                    <CardContent className="p-4">
-                      <p>
-                        <strong>Fecha y Hora:</strong>{" "}
-                        {new Date(carga.fechaHora).toLocaleDateString("es-ES", {
-                          weekday: "long",
-                          day: "numeric",
-                          month: "long",
-                          year: "numeric",
-                        })}{" "}
-                        {new Date(carga.fechaHora).toLocaleTimeString("es-ES")}
-                      </p>
-                      <p>
-                        <strong>Estado:</strong>{" "}
-                        <Badge className={carga.estado === "deuda" ? "bg-red-500" : "bg-green-500"}>
-                          {carga.estado}
-                        </Badge>
-                      </p>
-                      <p>
-                        <strong>Costo:</strong> Bs{carga.costo || 30}
-                      </p>
-                      <p>
-                        <strong>Usuario:</strong>{" "}
-                        {carga.usuario?.nombre || carga.usuario?.username || carga.conductorNombre || "N/A"}
-                      </p>
-                      <p>
-                        <strong>Tipo:</strong>{" "}
-                        <Badge
-                          variant="outline"
-                          className={carga.tipoCuenta === "propietario" ? "bg-blue-100" : "bg-green-100"}
-                        >
-                          {carga.tipoCuenta === "propietario" ? "Propietario" : "Conductor"}
-                        </Badge>
-                      </p>
-                    </CardContent>
-                    <CardFooter className="flex justify-between">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => fetchChargeDetails(carga.id)}
-                        className="bg-gray-900 hover:bg-gray-800 text-white border-gray-700"
-                      >
-                        Ver Detalles
-                      </Button>
-                    </CardFooter>
-                  </Card>
-                ))}
-
-                <div className="flex justify-between items-center mt-4">
+              {!isMobile && cargasFiltradas.length > 0 && (
+                <div className="flex justify-between items-center mt-6">
                   <Button
                     onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
                     disabled={currentPage === 1}
@@ -912,358 +1099,291 @@ export default function UsuarioDetalles() {
                     Siguiente <ChevronRight className="ml-2 h-4 w-4" />
                   </Button>
                 </div>
-              </div>
-            ) : (
-              <div className="border-[3px] border-gray-600 rounded-lg overflow-hidden shadow-xl">
-                <Table className="w-full border-collapse">
-                  <TableHeader className="bg-gray-700">
-                    <TableRow className="border-b-0">
-                      <TableHead className="font-bold text-white py-4 border-0">Fecha y Hora</TableHead>
-                      <TableHead className="font-bold text-white py-4 border-0">Estado</TableHead>
-                      <TableHead className="font-bold text-white py-4 border-0">Costo</TableHead>
-                      <TableHead className="font-bold text-white py-4 border-0">Usuario</TableHead>
-                      <TableHead className="font-bold text-white py-4 border-0">Acciones</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paginatedCargas.map((carga) => (
-                      <TableRow key={carga.id} className="border-0 hover:bg-gray-50">
-                        <TableCell className="border-0 py-3">
-                          {new Date(carga.fechaHora).toLocaleDateString("es-ES", {
-                            weekday: "long",
-                            day: "numeric",
-                            month: "long",
-                            year: "numeric",
-                          })}{" "}
-                          {new Date(carga.fechaHora).toLocaleTimeString("es-ES")}
-                        </TableCell>
-                        <TableCell className="border-0 py-3">
-                          <Badge className={carga.estado === "deuda" ? "bg-red-500" : "bg-green-500"}>
-                            {carga.estado}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="border-0 py-3">Bs{carga.costo || 30}</TableCell>
-                        <TableCell className="border-0 py-3">
-                          {carga.usuario?.nombre || carga.usuario?.username || carga.conductorNombre || "N/A"}
-                        </TableCell>
-                        <TableCell className="border-0 py-3">
-                          <div className="flex space-x-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => fetchChargeDetails(carga.id)}
-                              className="bg-gray-900 hover:bg-gray-800 text-white border-gray-700"
-                            >
-                              Ver Detalles
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
+              )}
+            </CardContent>
+          </Card>
+        </>
 
-            {!isMobile && cargasFiltradas.length > 0 && (
-              <div className="flex justify-between items-center mt-6">
-                <Button
-                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                  disabled={currentPage === 1}
-                  variant="outline"
-                  className="border-2 border-gray-300"
-                >
-                  <ChevronLeft className="mr-2 h-4 w-4" /> Anterior
-                </Button>
-                <span>
-                  Página {currentPage} de {totalPages || 1}
-                </span>
-                <Button
-                  onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                  disabled={currentPage === totalPages || totalPages === 0}
-                  variant="outline"
-                  className="border-2 border-gray-300"
-                >
-                  Siguiente <ChevronRight className="ml-2 h-4 w-4" />
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </>
-
-      {/* Diálogo de Pago Simplificado */}
-      <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
-        <DialogContent className="border-2 border-gray-300 max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center">
-              <Receipt className="mr-2 h-5 w-5" />
-              Realizar Pago
-            </DialogTitle>
-            <DialogDescription>
-              Seleccione el número de cargas a pagar. Se pagarán las cargas más antiguas primero.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-6 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="numeroCargasAPagar">Número de Cargas a Pagar:</Label>
-              <Input
-                id="numeroCargasAPagar"
-                type="number"
-                min="1"
-                max={cargasDeuda.length}
-                value={numeroCargasAPagar}
-                onChange={handleNumeroCargasChange}
-                className="border-2 border-gray-300"
-              />
-              <p className="text-sm text-gray-500">Máximo: {cargasDeuda.length} cargas pendientes</p>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Monto Total a Pagar:</Label>
-              <div className="text-2xl font-bold text-green-600">Bs {montoTotal.toFixed(2)}</div>
-            </div>
-
-            {numeroCargasAPagar > 0 && (
-              <div className="space-y-2">
-                <Label>Cargas que se pagarán:</Label>
-                <div className="max-h-32 overflow-y-auto border rounded-md p-2 bg-gray-50">
-                  {cargasDeuda.slice(0, numeroCargasAPagar).map((carga, index) => (
-                    <div key={carga.id} className="flex justify-between text-sm py-1">
-                      <span>
-                        #{carga.id} - {new Date(carga.fechaHora).toLocaleDateString()}
-                      </span>
-                      <span className="font-medium">Bs {carga.costo || 30}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPaymentDialog(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handlePagar} className="bg-green-600 hover:bg-green-700 text-white">
-              <Receipt className="mr-2 h-4 w-4" />
-              Confirmar Pago
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Diálogo de Recibo */}
-      <Dialog open={showReceiptDialog} onOpenChange={setShowReceiptDialog}>
-        <DialogContent className="border-2 border-gray-300 max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center text-green-600">
-              <Receipt className="mr-2 h-5 w-5" />
-              ¡Pago Realizado con Éxito!
-            </DialogTitle>
-          </DialogHeader>
-          {pagoRealizado && (
-            <div className="space-y-4">
-              {/* Encabezado del recibo */}
-              <div className="text-center border-b pb-4">
-                <h3 className="text-lg font-bold text-blue-900">DISTRIBUIDORA DE AGUA LOS PINOS</h3>
-                <p className="text-sm text-gray-600">Comprobante de Pago</p>
-              </div>
-
-              {/* Información del recibo */}
-              <div className="space-y-3 bg-gray-50 p-4 rounded-lg">
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <span className="font-medium">Número de Recibo:</span>
-                    <p className="text-blue-600 font-mono">{pagoRealizado.numeroRecibo}</p>
-                  </div>
-                  <div>
-                    <span className="font-medium">Fecha y hora:</span>
-                    <p>{pagoRealizado.fechaHora}</p>
-                  </div>
-                  <div>
-                    <span className="font-medium">Cliente:</span>
-                    <p>{pagoRealizado.cliente}</p>
-                  </div>
-                  <div>
-                    <span className="font-medium">Tipo:</span>
-                    <p>{pagoRealizado.tipoCliente}</p>
-                  </div>
-                  <div>
-                    <span className="font-medium">Cargas pagadas:</span>
-                    <p className="font-bold">{pagoRealizado.numeroCargas}</p>
-                  </div>
-                  <div>
-                    <span className="font-medium">Importe total:</span>
-                    <p className="text-green-600 font-bold text-lg">Bs {pagoRealizado.montoTotal.toFixed(2)}</p>
+        {/* Diálogo de Pago Simplificado */}
+        <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
+          <DialogContent className="border-2 border-gray-300 max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center">
+                <Receipt className="mr-2 h-5 w-5" />
+                Realizar Pago
+              </DialogTitle>
+              <DialogDescription>
+                Seleccione el número de cargas a pagar. Se pagarán las cargas más antiguas primero.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-6 py-4">
+              {!isOnline && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                  <div className="flex items-center gap-2 text-yellow-800">
+                    <span className="text-sm">Sin conexión - El pago se procesará cuando vuelva la conexión</span>
                   </div>
                 </div>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="numeroCargasAPagar">Número de Cargas a Pagar:</Label>
+                <Input
+                  id="numeroCargasAPagar"
+                  type="number"
+                  min="1"
+                  max={cargasDeuda.length}
+                  value={numeroCargasAPagar}
+                  onChange={handleNumeroCargasChange}
+                  className="border-2 border-gray-300"
+                />
+                <p className="text-sm text-gray-500">Máximo: {cargasDeuda.length} cargas pendientes</p>
               </div>
 
-              {/* Detalle de cargas */}
               <div className="space-y-2">
-                <h4 className="font-medium text-sm">Detalle de cargas pagadas:</h4>
-                <div className="max-h-40 overflow-y-auto border rounded p-2 text-xs space-y-2">
-                  {pagoRealizado.cargasDetalle.map((carga, index) => (
-                    <div key={carga.id} className="p-2 bg-gray-50 rounded border-l-2 border-blue-500">
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <p className="font-medium">Carga #{carga.id}</p>
-                          <p className="text-gray-600">
-                            {new Date(carga.fechaHora).toLocaleDateString("es-ES", {
-                              weekday: "short",
-                              year: "numeric",
-                              month: "short",
-                              day: "numeric",
-                            })}{" "}
-                            -{" "}
-                            {new Date(carga.fechaHora).toLocaleTimeString("es-ES", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </p>
-                          <p className="text-gray-600">
-                            Usuario: {carga.usuario?.nombre || carga.usuario?.username || "N/A"}
-                          </p>
-                        </div>
-                        <span className="font-bold text-green-600">Bs {carga.costo}</span>
+                <Label>Monto Total a Pagar:</Label>
+                <div className="text-2xl font-bold text-green-600">Bs {montoTotal.toFixed(2)}</div>
+              </div>
+
+              {numeroCargasAPagar > 0 && (
+                <div className="space-y-2">
+                  <Label>Cargas que se pagarán:</Label>
+                  <div className="max-h-32 overflow-y-auto border rounded-md p-2 bg-gray-50">
+                    {cargasDeuda.slice(0, numeroCargasAPagar).map((carga, index) => (
+                      <div key={carga.id} className="flex justify-between text-sm py-1">
+                        <span>
+                          #{carga.id} - {new Date(carga.fechaHora).toLocaleDateString()}
+                        </span>
+                        <span className="font-medium">Bs {carga.costo || 30}</span>
                       </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowPaymentDialog(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handlePagar} className="bg-green-600 hover:bg-green-700 text-white">
+                <Receipt className="mr-2 h-4 w-4" />
+                Confirmar Pago
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Diálogo de Recibo */}
+        <Dialog open={showReceiptDialog} onOpenChange={setShowReceiptDialog}>
+          <DialogContent className="border-2 border-gray-300 max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center text-green-600">
+                <Receipt className="mr-2 h-5 w-5" />
+                ¡Pago Realizado con Éxito!
+              </DialogTitle>
+            </DialogHeader>
+            {pagoRealizado && (
+              <div className="space-y-4">
+                {/* Encabezado del recibo */}
+                <div className="text-center border-b pb-4">
+                  <h3 className="text-lg font-bold text-blue-900">DISTRIBUIDORA DE AGUA LOS PINOS</h3>
+                  <p className="text-sm text-gray-600">Comprobante de Pago</p>
+                </div>
+
+                {/* Información del recibo */}
+                <div className="space-y-3 bg-gray-50 p-4 rounded-lg">
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <span className="font-medium">Número de Recibo:</span>
+                      <p className="text-blue-600 font-mono">{pagoRealizado.numeroRecibo}</p>
                     </div>
-                  ))}
+                    <div>
+                      <span className="font-medium">Fecha y hora:</span>
+                      <p>{pagoRealizado.fechaHora}</p>
+                    </div>
+                    <div>
+                      <span className="font-medium">Cliente:</span>
+                      <p>{pagoRealizado.cliente}</p>
+                    </div>
+                    <div>
+                      <span className="font-medium">Tipo:</span>
+                      <p>{pagoRealizado.tipoCliente}</p>
+                    </div>
+                    <div>
+                      <span className="font-medium">Cargas pagadas:</span>
+                      <p className="font-bold">{pagoRealizado.numeroCargas}</p>
+                    </div>
+                    <div>
+                      <span className="font-medium">Importe total:</span>
+                      <p className="text-green-600 font-bold text-lg">Bs {pagoRealizado.montoTotal.toFixed(2)}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Detalle de cargas */}
+                <div className="space-y-2">
+                  <h4 className="font-medium text-sm">Detalle de cargas pagadas:</h4>
+                  <div className="max-h-40 overflow-y-auto border rounded p-2 text-xs space-y-2">
+                    {pagoRealizado.cargasDetalle.map((carga, index) => (
+                      <div key={carga.id} className="p-2 bg-gray-50 rounded border-l-2 border-blue-500">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <p className="font-medium">Carga #{carga.id}</p>
+                            <p className="text-gray-600">
+                              {new Date(carga.fechaHora).toLocaleDateString("es-ES", {
+                                weekday: "short",
+                                year: "numeric",
+                                month: "short",
+                                day: "numeric",
+                              })}{" "}
+                              -{" "}
+                              {new Date(carga.fechaHora).toLocaleTimeString("es-ES", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </p>
+                            <p className="text-gray-600">
+                              Usuario: {carga.usuario?.nombre || carga.usuario?.username || "N/A"}
+                            </p>
+                          </div>
+                          <span className="font-bold text-green-600">Bs {carga.costo}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Pie del recibo */}
+                <div className="text-center text-xs text-gray-500 border-t pt-2">
+                  <p>Este comprobante es válido como constancia de pago</p>
+                  <p>Sistema de Gestión - Los Pinos</p>
                 </div>
               </div>
+            )}
+            <DialogFooter className="flex justify-between">
+              <Button
+                variant="outline"
+                onClick={() => pagoRealizado && generarPDFRecibo(pagoRealizado)}
+                className="flex items-center"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Descargar PDF
+              </Button>
+              <Button onClick={() => setShowReceiptDialog(false)} className="bg-green-600 hover:bg-green-700">
+                Cerrar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-              {/* Pie del recibo */}
-              <div className="text-center text-xs text-gray-500 border-t pt-2">
-                <p>Este comprobante es válido como constancia de pago</p>
-                <p>Sistema de Gestión - Los Pinos</p>
-              </div>
-            </div>
-          )}
-          <DialogFooter className="flex justify-between">
-            <Button
-              variant="outline"
-              onClick={() => pagoRealizado && generarPDFRecibo(pagoRealizado)}
-              className="flex items-center"
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Descargar PDF
-            </Button>
-            <Button onClick={() => setShowReceiptDialog(false)} className="bg-green-600 hover:bg-green-700">
-              Cerrar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Diálogo de Filtros */}
-      <Dialog open={showFilterDialog} onOpenChange={setShowFilterDialog}>
-        <DialogContent className="border-2 border-gray-300">
-          <DialogHeader>
-            <DialogTitle>Filtrar Cargas</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Checkbox
-                id="activarFiltros"
-                checked={filtrosActivos}
-                onCheckedChange={(checked) => setFiltrosActivos(checked === true)}
-              />
-              <Label htmlFor="activarFiltros">Activar filtros</Label>
-            </div>
-
-            <div className={`grid gap-4 ${!filtrosActivos ? "opacity-50 pointer-events-none" : ""}`}>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="filtroEstado" className="text-right">
-                  Estado:
-                </Label>
-                <Select value={filtroEstado} onValueChange={setFiltroEstado} disabled={!filtrosActivos}>
-                  <SelectTrigger className="col-span-3 border-2 border-gray-300">
-                    <SelectValue placeholder="Todos los estados" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos</SelectItem>
-                    <SelectItem value="deuda">Deuda</SelectItem>
-                    <SelectItem value="pagado">Pagado</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="fechaInicio" className="text-right">
-                  Fecha Inicio:
-                </Label>
-                <Input
-                  id="fechaInicio"
-                  type="date"
-                  value={fechaInicio}
-                  onChange={(e) => setFechaInicio(e.target.value)}
-                  className="col-span-3 border-2 border-gray-300"
-                  disabled={!filtrosActivos}
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="fechaFin" className="text-right">
-                  Fecha Fin:
-                </Label>
-                <Input
-                  id="fechaFin"
-                  type="date"
-                  value={fechaFin}
-                  onChange={(e) => setFechaFin(e.target.value)}
-                  className="col-span-3 border-2 border-gray-300"
-                  disabled={!filtrosActivos}
-                />
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button onClick={() => setShowFilterDialog(false)} className="border-2 border-gray-300">
-              {filtrosActivos ? "Aplicar Filtros" : "Cerrar"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Diálogo de Detalles de Carga */}
-      <Dialog open={showChargeDetailsDialog} onOpenChange={setShowChargeDetailsDialog}>
-        <DialogContent className="border-2 border-gray-300">
-          <DialogHeader>
-            <DialogTitle>Detalles de la Carga #{selectedCharge?.id}</DialogTitle>
-          </DialogHeader>
-          {selectedCharge && (
+        {/* Diálogo de Filtros */}
+        <Dialog open={showFilterDialog} onOpenChange={setShowFilterDialog}>
+          <DialogContent className="border-2 border-gray-300">
+            <DialogHeader>
+              <DialogTitle>Filtrar Cargas</DialogTitle>
+            </DialogHeader>
             <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <span className="font-medium text-right">Fecha y Hora:</span>
-                <span className="col-span-3">{new Date(selectedCharge.fechaHora).toLocaleString()}</span>
+              <div className="flex items-center gap-2 mb-2">
+                <Checkbox
+                  id="activarFiltros"
+                  checked={filtrosActivos}
+                  onCheckedChange={(checked) => setFiltrosActivos(checked === true)}
+                />
+                <Label htmlFor="activarFiltros">Activar filtros</Label>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <span className="font-medium text-right">Estado:</span>
-                <span className="col-span-3">
-                  <Badge className={selectedCharge.estado === "deuda" ? "bg-red-500" : "bg-green-500"}>
-                    {selectedCharge.estado}
-                  </Badge>
-                </span>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <span className="font-medium text-right">Usuario:</span>
-                <span className="col-span-3">{selectedCharge.usuario?.nombre || "N/A"}</span>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <span className="font-medium text-right">Tipo de Camión:</span>
-                <span className="col-span-3">{selectedCharge.tiposDeCamion?.descripcion || "N/A"}</span>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <span className="font-medium text-right">Costo:</span>
-                <span className="col-span-3">Bs{selectedCharge.costo || 30}</span>
+
+              <div className={`grid gap-4 ${!filtrosActivos ? "opacity-50 pointer-events-none" : ""}`}>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="filtroEstado" className="text-right">
+                    Estado:
+                  </Label>
+                  <Select value={filtroEstado} onValueChange={setFiltroEstado} disabled={!filtrosActivos}>
+                    <SelectTrigger className="col-span-3 border-2 border-gray-300">
+                      <SelectValue placeholder="Todos los estados" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos</SelectItem>
+                      <SelectItem value="deuda">Deuda</SelectItem>
+                      <SelectItem value="pagado">Pagado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="fechaInicio" className="text-right">
+                    Fecha Inicio:
+                  </Label>
+                  <Input
+                    id="fechaInicio"
+                    type="date"
+                    value={fechaInicio}
+                    onChange={(e) => setFechaInicio(e.target.value)}
+                    className="col-span-3 border-2 border-gray-300"
+                    disabled={!filtrosActivos}
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="fechaFin" className="text-right">
+                    Fecha Fin:
+                  </Label>
+                  <Input
+                    id="fechaFin"
+                    type="date"
+                    value={fechaFin}
+                    onChange={(e) => setFechaFin(e.target.value)}
+                    className="col-span-3 border-2 border-gray-300"
+                    disabled={!filtrosActivos}
+                  />
+                </div>
               </div>
             </div>
-          )}
-          <DialogFooter>
-            <Button onClick={() => setShowChargeDetailsDialog(false)} className="border-2 border-gray-300">
-              Cerrar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+            <DialogFooter>
+              <Button onClick={() => setShowFilterDialog(false)} className="border-2 border-gray-300">
+                {filtrosActivos ? "Aplicar Filtros" : "Cerrar"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Diálogo de Detalles de Carga */}
+        <Dialog open={showChargeDetailsDialog} onOpenChange={setShowChargeDetailsDialog}>
+          <DialogContent className="border-2 border-gray-300">
+            <DialogHeader>
+              <DialogTitle>Detalles de la Carga #{selectedCharge?.id}</DialogTitle>
+            </DialogHeader>
+            {selectedCharge && (
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <span className="font-medium text-right">Fecha y Hora:</span>
+                  <span className="col-span-3">{new Date(selectedCharge.fechaHora).toLocaleString()}</span>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <span className="font-medium text-right">Estado:</span>
+                  <span className="col-span-3">
+                    <Badge className={selectedCharge.estado === "deuda" ? "bg-red-500" : "bg-green-500"}>
+                      {selectedCharge.estado}
+                    </Badge>
+                  </span>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <span className="font-medium text-right">Usuario:</span>
+                  <span className="col-span-3">{selectedCharge.usuario?.nombre || "N/A"}</span>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <span className="font-medium text-right">Tipo de Camión:</span>
+                  <span className="col-span-3">{selectedCharge.tiposDeCamion?.descripcion || "N/A"}</span>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <span className="font-medium text-right">Costo:</span>
+                  <span className="col-span-3">Bs{selectedCharge.costo || 30}</span>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button onClick={() => setShowChargeDetailsDialog(false)} className="border-2 border-gray-300">
+                Cerrar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </NetworkStatusHandler>
   )
 }

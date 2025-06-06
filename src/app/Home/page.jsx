@@ -32,7 +32,7 @@ import {
 } from "../../utils/pwa-helpers"
 
 export default function ProfilePage() {
-  const [profile, setProfile] = useState({ nombre: "", username: "", correo: "", ci: "", rol: "" })
+  const [profile, setProfile] = useState({ nombre: "", username: "", correo: "", ci: "" })
   const [editMode, setEditMode] = useState(false)
   const [userId, setUserId] = useState(null)
   const [token, setToken] = useState(null)
@@ -62,7 +62,7 @@ export default function ProfilePage() {
 
     setUserId(idUser)
     setToken(userToken)
-    setProfile((prev) => ({ ...prev, rol: userRole || "" }))
+    // El rol no se usa en este componente según el controlador
   }, [router])
 
   const apiUrl = userId ? `https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/perfil/${userId}` : ""
@@ -82,7 +82,7 @@ export default function ProfilePage() {
         // Cargar desde IndexedDB cuando está offline
         const cachedData = await getFromIndexedDB("profile", userId)
         if (cachedData && cachedData.data) {
-          setProfile((prev) => ({ ...cachedData.data, rol: prev.rol }))
+          setProfile(cachedData.data)
           setIsLoading(false)
           return
         }
@@ -97,7 +97,7 @@ export default function ProfilePage() {
       const data = await response.json()
 
       if (response.ok) {
-        setProfile((prev) => ({ ...data, rol: prev.rol }))
+        setProfile(data) // El controlador ya devuelve exactamente los campos que necesitamos
         // Guardar en caché
         await saveToIndexedDB("profile", { id: userId, data, timestamp: Date.now() })
       } else {
@@ -110,7 +110,7 @@ export default function ProfilePage() {
       // Cargar desde caché en caso de error
       const cachedData = await getFromIndexedDB("profile", userId)
       if (cachedData && cachedData.data) {
-        setProfile((prev) => ({ ...cachedData.data, rol: prev.rol }))
+        setProfile(cachedData.data)
         toast({
           title: "Usando datos en caché",
           description: "Estás viendo datos almacenados localmente.",
@@ -137,8 +137,13 @@ export default function ProfilePage() {
 
     try {
       if (!isOnline) {
-        // Registrar para sincronización offline
-        await registerSyncRequest(apiUrl, "PUT", profile)
+        // Registrar para sincronización offline con solo los campos permitidos
+        const updateData = {
+          nombre: profile.nombre,
+          username: profile.username,
+          correo: profile.correo,
+        }
+        await registerSyncRequest(apiUrl, "PUT", updateData)
 
         // Actualizar caché local
         await saveToIndexedDB("profile", { id: userId, data: profile, timestamp: Date.now() })
@@ -159,7 +164,11 @@ export default function ProfilePage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(profile),
+        body: JSON.stringify({
+          nombre: profile.nombre,
+          username: profile.username,
+          correo: profile.correo,
+        }),
       })
 
       if (response.ok) {
@@ -204,32 +213,6 @@ export default function ProfilePage() {
       .join("")
       .toUpperCase()
       .substring(0, 2)
-  }
-
-  const getRoleColor = (role) => {
-    switch (role?.toLowerCase()) {
-      case "admin":
-        return "bg-red-100 text-red-800 border-red-200"
-      case "propietario":
-        return "bg-blue-100 text-blue-800 border-blue-200"
-      case "conductor":
-        return "bg-green-100 text-green-800 border-green-200"
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-200"
-    }
-  }
-
-  const getRoleLabel = (role) => {
-    switch (role?.toLowerCase()) {
-      case "admin":
-        return "Administrador"
-      case "propietario":
-        return "Propietario"
-      case "conductor":
-        return "Conductor"
-      default:
-        return "Usuario"
-    }
   }
 
   if (isLoading) {
@@ -296,9 +279,6 @@ export default function ProfilePage() {
                   <div className="text-center mt-4">
                     <h2 className="text-xl font-bold text-gray-800">{profile.nombre}</h2>
                     <p className="text-gray-500">@{profile.username}</p>
-                    <div className="mt-2">
-                      <Badge className={`${getRoleColor(profile.rol)}`}>{getRoleLabel(profile.rol)}</Badge>
-                    </div>
                   </div>
 
                   <Separator className="my-4" />
@@ -435,10 +415,9 @@ export default function ProfilePage() {
                               id="ci"
                               name="ci"
                               value={profile.ci}
-                              onChange={handleChange}
-                              className={`pl-10 ${!editMode ? "bg-gray-50" : ""}`}
+                              className="pl-10 bg-gray-50"
                               placeholder="Tu cédula de identidad"
-                              readOnly={!editMode}
+                              readOnly={true}
                             />
                           </div>
                         </div>

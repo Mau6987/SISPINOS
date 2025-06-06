@@ -526,18 +526,18 @@ export default function ClientManagementOffline() {
 
           {/* Header mejorado con diseño atractivo */}
           <div className="bg-white rounded-xl shadow-lg border border-gray-200 mb-6 overflow-hidden">
-            <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-8">
+            <div className="bg-gradient-to-r from-slate-800 to-slate-900 px-6 py-8">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div className="text-center sm:text-left">
-                  <h1 className="text-3xl font-bold text-white mb-2">Gestión de Clientes</h1>
-                  <p className="text-blue-100 text-lg">Administra usuarios, tarjetas RFID y estados de cuenta</p>
+                  <h1 className="text-3xl font-bold text-white mb-2 tracking-tight">Administración de Clientes</h1>
+                  <p className="text-slate-300 text-lg font-medium">Sistema integral de gestión de usuarios y control de acceso</p>
                 </div>
                 <div className="flex justify-center sm:justify-end w-full sm:w-auto">
                   <OfflineIndicator />
                 </div>
               </div>
             </div>
-            <div className="h-1 bg-gradient-to-r from-blue-400 to-indigo-500"></div>
+            <div className="h-1 bg-gradient-to-r from-slate-600 to-slate-700"></div>
           </div>
 
           <Toaster />

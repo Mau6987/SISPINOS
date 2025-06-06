@@ -208,7 +208,7 @@ export default function WaterChargesOwner() {
     setShowDetailsDialog(true)
   }
 
-  // Función para generar PDF de todas las cargas filtradas
+  // Función para generar PDF de todas las cargas filtradas con formato de comprobante
   const handleDownloadAllChargesPDF = async () => {
     try {
       if (filteredData.length === 0) {
@@ -263,83 +263,199 @@ export default function WaterChargesOwner() {
         doc.setTextColor(...negro)
         doc.text("REPORTE DE CARGAS", pageWidth / 2, 30, { align: "center" })
 
-        // Información del reporte
+        // Información del reporte en formato compacto
         let yPos = 38
-        doc.setFontSize(6)
-        doc.setFont("helvetica", "bold")
+        const lineHeight = 4
 
-        // Información del propietario
-        doc.text(`Propietario: ${userName}`, margin, yPos)
-
-        // Rango de fechas
-        if (!showAllTime && filterStartDate && filterEndDate) {
-          const formattedStartDate = format(new Date(filterStartDate), "dd/MM/yyyy", { locale: es })
-          const formattedEndDate = format(new Date(filterEndDate), "dd/MM/yyyy", { locale: es })
-          doc.text(`Período: ${formattedStartDate} - ${formattedEndDate}`, margin, yPos + 4)
-          yPos += 8
-        } else {
-          doc.text("Período: Todas las cargas", margin, yPos + 4)
-          yPos += 8
-        }
-
-        doc.text(`Fecha de generación: ${new Date().toLocaleDateString("es-ES")}`, margin, yPos)
-        yPos += 8
-
-        // Resumen general en recuadro
+        // Dibujar recuadro para la información
         doc.setDrawColor(...azulOscuro)
         doc.setLineWidth(0.3)
-        doc.rect(margin, yPos, pageWidth - 2 * margin, 16, "D")
+        doc.rect(margin, yPos - 2, pageWidth - 2 * margin, 16)
 
+        // Información básica del reporte
         doc.setFont("helvetica", "bold")
         doc.setFontSize(6)
-        yPos += 4
 
-        // Primera línea del resumen
-        doc.text(`Total de cargas: ${summary.totalCargas}`, margin + 2, yPos)
-        doc.text(`Cargas pagadas: ${summary.totalPagadas}`, margin + 45, yPos)
-        doc.text(`Cargas pendientes: ${summary.totalDeuda}`, margin + 85, yPos)
+        // Primera fila
+        doc.text("Generado:", margin + 2, yPos + 2)
+        doc.setFont("helvetica", "normal")
+        doc.text(format(new Date(), "dd/MM/yyyy HH:mm", { locale: es }), margin + 22, yPos + 2)
 
-        yPos += 4
-        // Segunda línea del resumen
-        doc.text(`Monto pagado: Bs ${summary.montoPagadas}`, margin + 2, yPos)
-        doc.text(`Monto pendiente: Bs ${summary.montoDeuda}`, margin + 45, yPos)
-        doc.text(`Total: Bs ${summary.montoPagadas + summary.montoDeuda}`, margin + 85, yPos)
+        doc.setFont("helvetica", "bold")
+        doc.text(`${userName}:`, pageWidth / 2 + 2, yPos + 2)
+        doc.setFont("helvetica", "normal")
+        doc.text("Propietario", pageWidth / 2 + 22, yPos + 2)
 
-        yPos += 12
-
-        // Resumen de conductores
-        if (Object.keys(summary.conductoresPorCargas).length > 0) {
+        // Segunda fila - Período con fechas completas
+        if (!showAllTime && filterStartDate && filterEndDate) {
           doc.setFont("helvetica", "bold")
-          doc.setFontSize(7)
-          doc.text("RESUMEN POR CONDUCTOR:", margin, yPos)
-          yPos += 5
-
+          doc.text("Período:", margin + 2, yPos + 6)
           doc.setFont("helvetica", "normal")
-          doc.setFontSize(5)
+          const fechaInicioCompleta = format(new Date(filterStartDate), "d 'de' MMMM 'del' yyyy", { locale: es })
+          const fechaFinCompleta = format(new Date(filterEndDate), "d 'de' MMMM 'del' yyyy", { locale: es })
+          const periodoTexto = `${fechaInicioCompleta} al ${fechaFinCompleta}`
 
-          Object.values(summary.conductoresPorCargas).forEach((conductor, index) => {
-            if (yPos > 200) {
-              doc.addPage()
-              yPos = 20
-            }
+          // Si el texto es muy largo, usar formato corto
+          if (periodoTexto.length > 80) {
             doc.text(
-              `${conductor.nombre}: ${conductor.totalCargas} cargas (${conductor.cargasPagadas} pagadas, ${conductor.cargasDeuda} pendientes)`,
-              margin,
-              yPos,
+              `${format(new Date(filterStartDate), "dd/MM/yyyy")} - ${format(new Date(filterEndDate), "dd/MM/yyyy")}`,
+              margin + 22,
+              yPos + 6,
             )
-            yPos += 4
-          })
-
-          yPos += 5
+          } else {
+            // Dividir en múltiples líneas si es necesario
+            const lineasPeriodo = doc.splitTextToSize(periodoTexto, pageWidth - margin - 24)
+            doc.text(lineasPeriodo, margin + 22, yPos + 6)
+          }
+        } else {
+          doc.setFont("helvetica", "bold")
+          doc.text("Período:", margin + 2, yPos + 6)
+          doc.setFont("helvetica", "normal")
+          doc.text("Todas las cargas", margin + 22, yPos + 6)
         }
 
-        // Título de la tabla
+        // Métricas principales en formato de tabla compacta
+        yPos = 58
         doc.setFont("helvetica", "bold")
-        doc.setFontSize(7)
+        doc.setFontSize(6)
+        doc.text("RESUMEN:", margin, yPos)
+        yPos += 5
+
+        // Crear tabla de resumen
+        const resumenTableWidth = pageWidth - 2 * margin
+        const resumenColWidths = [35, 25, 25, 25]
+        const resumenRowHeight = 5
+
+        // Encabezados de la tabla de resumen
+        doc.setFillColor(...grisClaro)
+        doc.rect(margin, yPos, resumenTableWidth, resumenRowHeight, "F")
+        doc.setDrawColor(...azulOscuro)
+        doc.setLineWidth(0.2)
+        doc.rect(margin, yPos, resumenTableWidth, resumenRowHeight)
+
+        doc.setFont("helvetica", "bold")
+        doc.setFontSize(5)
+        let xPos = margin + 1
+        doc.text("CONCEPTO", xPos, yPos + 3)
+        xPos += resumenColWidths[0]
+        doc.text("PAGADAS", xPos, yPos + 3)
+        xPos += resumenColWidths[1]
+        doc.text("PENDIENTES", xPos, yPos + 3)
+        xPos += resumenColWidths[2]
+        doc.text("TOTAL", xPos, yPos + 3)
+
+        yPos += resumenRowHeight
+
+        // Fila de cantidades
+        doc.setDrawColor(...azulOscuro)
+        doc.setLineWidth(0.1)
+        doc.rect(margin, yPos, resumenTableWidth, resumenRowHeight)
+
+        doc.setFont("helvetica", "normal")
+        doc.setFontSize(5)
+        xPos = margin + 1
+        doc.text("Cantidad de Cargas", xPos, yPos + 3)
+        xPos += resumenColWidths[0]
+        doc.text(summary.totalPagadas.toString(), xPos, yPos + 3)
+        xPos += resumenColWidths[1]
+        doc.text(summary.totalDeuda.toString(), xPos, yPos + 3)
+        xPos += resumenColWidths[2]
+        doc.text(summary.totalCargas.toString(), xPos, yPos + 3)
+
+        yPos += resumenRowHeight
+
+        // Fila de montos
+        doc.setDrawColor(...azulOscuro)
+        doc.setLineWidth(0.1)
+        doc.rect(margin, yPos, resumenTableWidth, resumenRowHeight)
+
+        xPos = margin + 1
+        doc.text("Monto (Bs)", xPos, yPos + 3)
+        xPos += resumenColWidths[0]
+        doc.text(summary.montoPagadas.toString(), xPos, yPos + 3)
+        xPos += resumenColWidths[1]
+        doc.text(summary.montoDeuda.toString(), xPos, yPos + 3)
+        xPos += resumenColWidths[2]
+        doc.text((summary.montoPagadas + summary.montoDeuda).toString(), xPos, yPos + 3)
+
+        yPos += resumenRowHeight + 8
+
+        // Tabla de conductores en formato estructurado
+        if (Object.keys(summary.conductoresPorCargas).length > 0) {
+          doc.setFont("helvetica", "bold")
+          doc.setFontSize(6)
+          doc.text("CONDUCTORES:", margin, yPos)
+          yPos += 5
+
+          // Configuración de tabla de conductores
+          const conductoresTableWidth = pageWidth - 2 * margin
+          const conductoresColWidths = [40, 20, 20, 20]
+          const conductoresRowHeight = 5
+
+          // Encabezados de la tabla de conductores
+          doc.setFillColor(...grisClaro)
+          doc.rect(margin, yPos, conductoresTableWidth, conductoresRowHeight, "F")
+          doc.setDrawColor(...azulOscuro)
+          doc.setLineWidth(0.2)
+          doc.rect(margin, yPos, conductoresTableWidth, conductoresRowHeight)
+
+          doc.setFont("helvetica", "bold")
+          doc.setFontSize(5)
+          xPos = margin + 1
+          doc.text("NOMBRE", xPos, yPos + 3)
+          xPos += conductoresColWidths[0]
+          doc.text("TOTAL", xPos, yPos + 3)
+          xPos += conductoresColWidths[1]
+          doc.text("PAGADAS", xPos, yPos + 3)
+          xPos += conductoresColWidths[2]
+          doc.text("PENDIENTES", xPos, yPos + 3)
+
+          yPos += conductoresRowHeight
+
+          // Filas de conductores (máximo 5 para mantener el formato compacto)
+          const conductoresArray = Object.values(summary.conductoresPorCargas)
+          const maxConductores = Math.min(conductoresArray.length, 5)
+
+          doc.setFont("helvetica", "normal")
+          doc.setFontSize(4)
+
+          for (let i = 0; i < maxConductores; i++) {
+            const conductor = conductoresArray[i]
+
+            doc.setDrawColor(...azulOscuro)
+            doc.setLineWidth(0.1)
+            doc.rect(margin, yPos, conductoresTableWidth, conductoresRowHeight)
+
+            xPos = margin + 1
+            doc.text(conductor.nombre.substring(0, 20), xPos, yPos + 3)
+            xPos += conductoresColWidths[0]
+            doc.text(conductor.totalCargas.toString(), xPos, yPos + 3)
+            xPos += conductoresColWidths[1]
+            doc.text(conductor.cargasPagadas.toString(), xPos, yPos + 3)
+            xPos += conductoresColWidths[2]
+            doc.text(conductor.cargasDeuda.toString(), xPos, yPos + 3)
+
+            yPos += conductoresRowHeight
+          }
+
+          // Si hay más conductores, indicarlo
+          if (conductoresArray.length > maxConductores) {
+            yPos += 2
+            doc.setFont("helvetica", "italic")
+            doc.setFontSize(4)
+            doc.text(`... y ${conductoresArray.length - maxConductores} conductores más`, margin, yPos)
+          }
+
+          yPos += 8
+        }
+
+        // Tabla de datos en formato compacto
+        doc.setFont("helvetica", "bold")
+        doc.setFontSize(6)
         doc.text("DETALLE DE CARGAS:", margin, yPos)
         yPos += 5
 
-        // Configuración de la tabla
+        // Configuración de tabla compacta
         const tableWidth = pageWidth - 2 * margin
         const colWidths = [12, 22, 18, 18, 25, 18, 15] // ID, Fecha, Hora, Estado, Usuario, Tipo, Costo
         const rowHeight = 6
@@ -356,7 +472,7 @@ export default function WaterChargesOwner() {
         doc.setFontSize(5)
         doc.setTextColor(...negro)
 
-        let xPos = margin + 1
+        xPos = margin + 1
         doc.text("ID", xPos, yPos + 4)
         xPos += colWidths[0]
         doc.text("FECHA", xPos, yPos + 4)
@@ -365,7 +481,7 @@ export default function WaterChargesOwner() {
         xPos += colWidths[2]
         doc.text("ESTADO", xPos, yPos + 4)
         xPos += colWidths[3]
-        doc.text("USUARIO", xPos, yPos + 4)
+        doc.text("NOMBRE", xPos, yPos + 4)
         xPos += colWidths[4]
         doc.text("TIPO", xPos, yPos + 4)
         xPos += colWidths[5]
@@ -377,26 +493,10 @@ export default function WaterChargesOwner() {
         doc.setFont("helvetica", "normal")
         doc.setFontSize(5)
 
-        filteredData.forEach((charge, index) => {
-          if (yPos > 200) {
-            // Si se acerca al final de la página
-            doc.addPage()
-            yPos = 20
-          }
+        const maxRowsToShow = Math.min(filteredData.length, 10)
+        const dataToShow = filteredData.slice(0, maxRowsToShow)
 
-          const fechaCarga = new Date(charge.fechaHora).toLocaleDateString("es-ES", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "2-digit",
-          })
-          const horaCarga = new Date(charge.fechaHora).toLocaleTimeString("es-ES", {
-            hour: "2-digit",
-            minute: "2-digit",
-          })
-          const usuarioCarga = (charge.usuario?.nombre || "N/A").substring(0, 12)
-          const estadoCarga = charge.estado === "deuda" ? "Pendiente" : "Pagado"
-          const tipoCarga = charge.usuario?.rol === "conductor" ? "Conductor" : "Propietario"
-
+        dataToShow.forEach((item, index) => {
           // Dibujar bordes de la fila
           doc.setDrawColor(...azulOscuro)
           doc.setLineWidth(0.2)
@@ -411,7 +511,20 @@ export default function WaterChargesOwner() {
 
           // Contenido de la fila
           xPos = margin + 1
-          doc.text(charge.id.toString(), xPos, yPos + 4)
+          const fechaCarga = new Date(item.fechaHora).toLocaleDateString("es-ES", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "2-digit",
+          })
+          const horaCarga = new Date(item.fechaHora).toLocaleTimeString("es-ES", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+          const usuarioCarga = (item.usuario?.nombre || "N/A").substring(0, 12)
+          const estadoCarga = item.estado === "deuda" ? "Pendiente" : "Pagado"
+          const tipoCarga = (item.tiposDeCamion?.descripcion || "N/A").substring(0, 8)
+
+          doc.text(item.id.toString(), xPos, yPos + 4)
           xPos += colWidths[0]
           doc.text(fechaCarga, xPos, yPos + 4)
           xPos += colWidths[1]
@@ -423,13 +536,22 @@ export default function WaterChargesOwner() {
           xPos += colWidths[4]
           doc.text(tipoCarga, xPos, yPos + 4)
           xPos += colWidths[5]
-          doc.text(`Bs ${charge.costo || 30}`, xPos, yPos + 4)
+          doc.text(`Bs ${item.costo || 30}`, xPos, yPos + 4)
 
           yPos += rowHeight
         })
 
-        // Pie del reporte
-        yPos += 5
+        // Si hay más datos de los que se muestran, indicarlo
+        if (filteredData.length > maxRowsToShow) {
+          yPos += 2
+          doc.setFont("helvetica", "italic")
+          doc.setFontSize(4)
+          doc.text(`... y ${filteredData.length - maxRowsToShow} registros más`, margin, yPos)
+          yPos += 3
+        }
+
+        // Pie del reporte (igual que el recibo)
+        yPos = 200 // Posición fija cerca del final
         doc.setDrawColor(...azulOscuro)
         doc.line(margin, yPos, pageWidth - margin, yPos)
 
@@ -438,7 +560,9 @@ export default function WaterChargesOwner() {
         doc.setFontSize(4)
         doc.text("Este reporte es válido como constancia de cargas.", pageWidth / 2, yPos, { align: "center" })
         doc.text("Distribuidora de Agua Los Pinos", pageWidth / 2, yPos + 3, { align: "center" })
-        doc.text(`Generado: ${new Date().toLocaleString()}`, pageWidth / 2, yPos + 6, { align: "center" })
+        doc.text(`Generado: ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: es })}`, pageWidth / 2, yPos + 6, {
+          align: "center",
+        })
 
         // Guardar PDF
         const fileName = showAllTime
@@ -510,48 +634,30 @@ export default function WaterChargesOwner() {
   const currentItems = filteredData.slice(indexOfFirstItem, indexOfLastItem)
   const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE)
 
-  // Calcular el monto total de los conductores
-  const calcularMontoTotal = () => {
-    // Suma el costo de todas las cargas en filteredData
-    return filteredData.reduce((total, item) => total + (item.costo || 30), 0)
-  }
-
-  // Función para obtener un color de fondo para cada conductor
-  const getBackgroundColor = (index) => {
-    const colors = [
-      "bg-blue-50",
-      "bg-green-50",
-      "bg-purple-50",
-      "bg-yellow-50",
-      "bg-pink-50",
-      "bg-indigo-50",
-      "bg-teal-50",
-      "bg-orange-50",
-    ]
-    return colors[index % colors.length]
-  }
-
   return (
     <div className="container mx-auto px-4 pt-20 pb-8 max-w-5xl">
-
-       <div className="bg-white rounded-lg shadow-md border border-gray-300 mb-6 overflow-hidden">
-          <div className="px-6 py-4">
-            <div className="flex items-center gap-3 justify-center">
-              <div className="w-12 h-12 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-full flex items-center justify-center shadow-lg border border-gray-300">
-                <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path d="M12 3C10 3 6 7 6 12C6 16 9 20 12 20C15 20 18 16 18 12C18 7 14 3 12 3Z" strokeWidth="2"/>
-                  <path d="M16 12C16 14.2091 14.2091 16 12 16C9.79086 16 8 14.2091 8 12C8 9.79086 9.79086 8 12 8" strokeWidth="2"/>
-                  <path d="M17 8V6C17 4.89543 16.1046 4 15 4H9C7.89543 4 7 4.89543 7 6V8" strokeWidth="2"/>
-                  <path d="M7 16V18" strokeWidth="2"/>
-                  <path d="M17 16V18" strokeWidth="2"/>
-                </svg>
-              </div>
-              <h1 className="text-3xl font-bold text-black tracking-tight">Cargas de Agua Propietario y Conductores</h1>
+      <div className="bg-white rounded-lg shadow-md border border-gray-300 mb-6 overflow-hidden">
+        <div className="px-6 py-4">
+          <div className="flex items-center gap-3 justify-center">
+            <div className="w-12 h-12 bg-gradient-to-br from-teal-600 to-teal-800 rounded-full flex items-center justify-center shadow-lg border border-gray-300">
+              <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M12 3C10 3 6 7 6 12C6 16 9 20 12 20C15 20 18 16 18 12C18 7 14 3 12 3Z" strokeWidth="2" />
+                <path
+                  d="M12 16C14.2091 16 16 14.2091 16 12C16 9.79086 14.2091 8 12 8C9.79086 8 8 9.79086 8 12C8 14.2091 9.79086 16 12 16Z"
+                  strokeWidth="2"
+                />
+                <path d="M7 10L5 12" strokeWidth="2" />
+                <path d="M19 12L17 10" strokeWidth="2" />
+                <path d="M12 7V9" strokeWidth="2" />
+              </svg>
             </div>
+            <h1 className="text-3xl font-bold text-black tracking-tight">Cargas de Agua - Propietario</h1>
           </div>
-          <div className="h-1 bg-gradient-to-r from-indigo-600 to-indigo-800"></div>
         </div>
-    <div className="flex justify-between items-center mb-6">
+        <div className="h-1 bg-gradient-to-r from-teal-600 to-teal-800"></div>
+      </div>
+
+      <div className="flex items-center mb-6">
         <div className="ml-auto flex gap-2">
           <Button
             onClick={handleDownloadAllChargesPDF}
@@ -567,16 +673,14 @@ export default function WaterChargesOwner() {
         </div>
       </div>
 
-
-      {/* Resumen principal con detalle de conductores integrado */}
+      {/* Resumen de cargas */}
       <div className="mb-8">
         <Card className="shadow-md border-2 border-gray-300 rounded-lg">
           <CardHeader className="bg-blue-900 text-white">
             <CardTitle className="text-white">{getSummaryTitle()}</CardTitle>
           </CardHeader>
           <CardContent className="p-4">
-            {/* Resumen general */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               {/* Total de cargas */}
               <div className="text-center">
                 <div className="bg-blue-100 p-2 rounded-t-md">
@@ -587,7 +691,7 @@ export default function WaterChargesOwner() {
                     <Droplet className="h-5 w-5 text-blue-600" />
                     <p className="text-2xl font-bold">{summary.totalCargas}</p>
                   </div>
-                  <p className="text-sm text-gray-500 mt-1">Bs {calcularMontoTotal()}</p>
+                  <p className="text-sm text-gray-500 mt-1">Bs {summary.montoPagadas + summary.montoDeuda}</p>
                 </div>
               </div>
 
@@ -618,29 +722,43 @@ export default function WaterChargesOwner() {
                   <p className="text-sm text-gray-500 mt-1">Bs {summary.montoDeuda}</p>
                 </div>
               </div>
+
+              {/* Total de conductores */}
+              <div className="text-center">
+                <div className="bg-purple-100 p-2 rounded-t-md">
+                  <p className="font-semibold text-purple-800">Conductores</p>
+                </div>
+                <div className="border border-t-0 border-purple-200 rounded-b-md p-3">
+                  <div className="flex items-center justify-center gap-2">
+                    <User className="h-5 w-5 text-purple-600" />
+                    <p className="text-2xl font-bold">{summary.totalConductores}</p>
+                  </div>
+                  <p className="text-sm text-gray-500 mt-1">Activos</p>
+                </div>
+              </div>
             </div>
 
-            {/* Detalle de conductores con colores suaves */}
+            {/* Información detallada de conductores */}
             {Object.keys(summary.conductoresPorCargas).length > 0 && (
-              <div className="mt-4 border-t pt-4">
-                <h3 className="text-lg font-semibold mb-3">Conductores</h3>
-                <div className="grid grid-cols-1 gap-2">
+              <div className="mt-6 border-t pt-4">
+                <h3 className="text-lg font-semibold text-gray-800 mb-3">Detalle por Conductor</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {Object.values(summary.conductoresPorCargas).map((conductor, index) => (
-                    <div
-                      key={index}
-                      className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-md ${getBackgroundColor(index)}`}
-                    >
-                      <div className="font-medium text-gray-800 mb-2 sm:mb-0">{conductor.nombre}</div>
-                      <div className="flex flex-wrap gap-2">
-                        <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
-                          cargas {conductor.totalCargas}
-                        </Badge>
-                        <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
-                          pagadas {conductor.cargasPagadas}
-                        </Badge>
-                        <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
-                          deuda {conductor.cargasDeuda}
-                        </Badge>
+                    <div key={index} className="bg-gray-50 p-3 rounded-lg border">
+                      <h4 className="font-medium text-gray-800 mb-2">{conductor.nombre}</h4>
+                      <div className="space-y-1 text-sm">
+                        <div className="flex justify-between">
+                          <span>Total cargas:</span>
+                          <span className="font-medium">{conductor.totalCargas}</span>
+                        </div>
+                        <div className="flex justify-between text-green-600">
+                          <span>Pagadas:</span>
+                          <span className="font-medium">{conductor.cargasPagadas}</span>
+                        </div>
+                        <div className="flex justify-between text-red-600">
+                          <span>Pendientes:</span>
+                          <span className="font-medium">{conductor.cargasDeuda}</span>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -657,14 +775,15 @@ export default function WaterChargesOwner() {
         </div>
       ) : (
         <>
-          {/* Tabla con borde exterior más delgado */}
+          {/* Tabla con borde exterior más definido */}
           <div className="border-[3px] border-gray-600 rounded-lg overflow-hidden shadow-xl">
             <Table className="w-full border-collapse">
               <TableHeader className="bg-gray-700">
                 <TableRow className="border-b-0">
                   <TableHead className="font-bold text-white py-4 border-0">Fecha y Hora</TableHead>
                   <TableHead className="font-bold text-white py-4 border-0">Estado</TableHead>
-                  <TableHead className="font-bold text-white py-4 border-0">Nombre de Usuario</TableHead>
+                  <TableHead className="font-bold text-white py-4 border-0">Conductor</TableHead>
+                  <TableHead className="font-bold text-white py-4 border-0">Tipo de Camión</TableHead>
                   <TableHead className="font-bold text-white py-4 border-0">Costo</TableHead>
                   <TableHead className="font-bold text-white py-4 border-0">Acciones</TableHead>
                 </TableRow>
@@ -678,6 +797,9 @@ export default function WaterChargesOwner() {
                         <Badge className={item.estado === "deuda" ? "bg-red-500" : "bg-green-500"}>{item.estado}</Badge>
                       </TableCell>
                       <TableCell className="border-0 py-3">{item.usuario?.nombre || "N/A"}</TableCell>
+                      <TableCell className="border-0 py-3">
+                        {item.tiposDeCamion?.descripcion || "No especificado"}
+                      </TableCell>
                       <TableCell className="border-0 py-3">Bs {item.costo || 30}</TableCell>
                       <TableCell className="border-0 py-3">
                         <Button
@@ -693,7 +815,7 @@ export default function WaterChargesOwner() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-gray-500 border-0">
+                    <TableCell colSpan={6} className="text-center py-8 text-gray-500 border-0">
                       No hay cargas para mostrar con los filtros seleccionados.
                     </TableCell>
                   </TableRow>
@@ -754,7 +876,7 @@ export default function WaterChargesOwner() {
             <div className={`grid gap-4 ${showAllTime ? "opacity-50" : ""}`}>
               <div className="grid grid-cols-4 items-center gap-4">
                 <label htmlFor="filterStartDate" className="text-right">
-                  Fecha de Inicio:
+                  Fecha Inicio:
                 </label>
                 <Input
                   id="filterStartDate"
@@ -767,7 +889,7 @@ export default function WaterChargesOwner() {
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <label htmlFor="filterEndDate" className="text-right">
-                  Fecha de Fin:
+                  Fecha Fin:
                 </label>
                 <Input
                   id="filterEndDate"
@@ -890,12 +1012,12 @@ export default function WaterChargesOwner() {
                 </CardContent>
               </Card>
 
-              {/* Información del Usuario */}
+              {/* Información del Conductor */}
               <Card className="border-purple-200">
                 <CardHeader className="bg-purple-50">
                   <CardTitle className="flex items-center text-purple-800">
                     <User className="mr-2 h-5 w-5" />
-                    Información del Usuario/Conductor
+                    Información del Conductor
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-6">
@@ -956,8 +1078,8 @@ export default function WaterChargesOwner() {
                     <div className="bg-gray-50 p-4 rounded-lg">
                       <h4 className="font-medium text-gray-800 mb-2">Descripción</h4>
                       <p className="text-gray-600">
-                        Esta carga corresponde al servicio de distribución de agua realizado por{" "}
-                        {selectedCharge.usuario?.rol === "conductor" ? "el conductor" : "el propietario"}
+                        Esta carga corresponde al servicio de distribución de agua realizado por el conductor{" "}
+                        <strong>{selectedCharge.usuario?.nombre}</strong>
                         {selectedCharge.tiposDeCamion?.descripcion &&
                           ` con ${selectedCharge.tiposDeCamion.descripcion.toLowerCase()}`}
                         . El estado actual es:{" "}

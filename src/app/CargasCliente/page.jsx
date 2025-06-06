@@ -185,7 +185,7 @@ export default function WaterChargesClient() {
     setShowDetailsDialog(true)
   }
 
-  // Función para generar PDF de todas las cargas filtradas
+  // Función para generar PDF de todas las cargas filtradas con formato de comprobante
   const handleDownloadAllChargesPDF = async () => {
     try {
       if (filteredData.length === 0) {
@@ -241,58 +241,134 @@ export default function WaterChargesClient() {
         doc.setTextColor(...negro)
         doc.text("REPORTE DE CARGAS", pageWidth / 2, 30, { align: "center" })
 
-        // Información del reporte
+        // Información del reporte en formato compacto
         let yPos = 38
-        doc.setFontSize(6)
-        doc.setFont("helvetica", "bold")
+        const lineHeight = 4
 
-        // Información del usuario
-        doc.text(`Usuario: ${userName}`, margin, yPos)
-        doc.text(`Rol: ${userRole}`, margin, yPos + 4)
-
-        // Rango de fechas
-        if (!showAllTime && startDate && endDate) {
-          const formattedStartDate = format(new Date(startDate), "dd/MM/yyyy", { locale: es })
-          const formattedEndDate = format(new Date(endDate), "dd/MM/yyyy", { locale: es })
-          doc.text(`Período: ${formattedStartDate} - ${formattedEndDate}`, margin, yPos + 8)
-          yPos += 12
-        } else {
-          doc.text("Período: Todas las cargas", margin, yPos + 8)
-          yPos += 12
-        }
-
-        doc.text(`Fecha de generación: ${new Date().toLocaleDateString("es-ES")}`, margin, yPos)
-        yPos += 8
-
-        // Resumen en recuadro
+        // Dibujar recuadro para la información
         doc.setDrawColor(...azulOscuro)
         doc.setLineWidth(0.3)
-        doc.rect(margin, yPos, pageWidth - 2 * margin, 16, "D")
+        doc.rect(margin, yPos - 2, pageWidth - 2 * margin, 16)
 
+        // Información básica del reporte
         doc.setFont("helvetica", "bold")
         doc.setFontSize(6)
-        yPos += 4
 
-        // Primera línea del resumen
-        doc.text(`Total de cargas: ${summary.totalCargas}`, margin + 2, yPos)
-        doc.text(`Cargas pagadas: ${summary.totalPagadas}`, margin + 45, yPos)
-        doc.text(`Cargas pendientes: ${summary.totalDeuda}`, margin + 85, yPos)
+        // Primera fila
+        doc.text("Generado:", margin + 2, yPos + 2)
+        doc.setFont("helvetica", "normal")
+        doc.text(format(new Date(), "dd/MM/yyyy HH:mm", { locale: es }), margin + 22, yPos + 2)
 
-        yPos += 4
-        // Segunda línea del resumen
-        doc.text(`Monto pagado: Bs ${summary.montoPagadas}`, margin + 2, yPos)
-        doc.text(`Monto pendiente: Bs ${summary.montoDeuda}`, margin + 45, yPos)
-        doc.text(`Total: Bs ${summary.montoPagadas + summary.montoDeuda}`, margin + 85, yPos)
-
-        yPos += 12
-
-        // Título de la tabla
         doc.setFont("helvetica", "bold")
-        doc.setFontSize(7)
+        doc.text(`${userName}:`, pageWidth / 2 + 2, yPos + 2)
+        doc.setFont("helvetica", "normal")
+        doc.text("Cliente", pageWidth / 2 + 18, yPos + 2)
+
+        // Segunda fila - Período con fechas completas
+        if (!showAllTime && startDate && endDate) {
+          doc.setFont("helvetica", "bold")
+          doc.text("Período:", margin + 2, yPos + 6)
+          doc.setFont("helvetica", "normal")
+          const fechaInicioCompleta = format(new Date(startDate), "d 'de' MMMM 'del' yyyy", { locale: es })
+          const fechaFinCompleta = format(new Date(endDate), "d 'de' MMMM 'del' yyyy", { locale: es })
+          const periodoTexto = `${fechaInicioCompleta} al ${fechaFinCompleta}`
+
+          // Si el texto es muy largo, usar formato corto
+          if (periodoTexto.length > 80) {
+            doc.text(
+              `${format(new Date(startDate), "dd/MM/yyyy")} - ${format(new Date(endDate), "dd/MM/yyyy")}`,
+              margin + 22,
+              yPos + 6,
+            )
+          } else {
+            // Dividir en múltiples líneas si es necesario
+            const lineasPeriodo = doc.splitTextToSize(periodoTexto, pageWidth - margin - 24)
+            doc.text(lineasPeriodo, margin + 22, yPos + 6)
+          }
+        } else {
+          doc.setFont("helvetica", "bold")
+          doc.text("Período:", margin + 2, yPos + 6)
+          doc.setFont("helvetica", "normal")
+          doc.text("Todas las cargas", margin + 22, yPos + 6)
+        }
+
+        doc.setFont("helvetica", "bold")
+        doc.text("Total cargas:", pageWidth / 2 + 2, yPos + 10)
+        doc.setFont("helvetica", "normal")
+        doc.text(summary.totalCargas.toString(), pageWidth / 2 + 25, yPos + 10)
+
+        // Métricas principales en formato de tabla compacta
+        yPos = 58
+        doc.setFont("helvetica", "bold")
+        doc.setFontSize(6)
+        doc.text("RESUMEN:", margin, yPos)
+        yPos += 5
+
+        // Crear tabla de resumen
+        const resumenTableWidth = pageWidth - 2 * margin
+        const resumenColWidths = [35, 25, 25, 25]
+        const resumenRowHeight = 5
+
+        // Encabezados de la tabla de resumen
+        doc.setFillColor(...grisClaro)
+        doc.rect(margin, yPos, resumenTableWidth, resumenRowHeight, "F")
+        doc.setDrawColor(...azulOscuro)
+        doc.setLineWidth(0.2)
+        doc.rect(margin, yPos, resumenTableWidth, resumenRowHeight)
+
+        doc.setFont("helvetica", "bold")
+        doc.setFontSize(5)
+        const xPos = margin + 1
+        doc.text("CONCEPTO", xPos, yPos + 3)
+        doc.text("PAGADAS", xPos + resumenColWidths[0], yPos + 3)
+        doc.text("PENDIENTES", xPos + resumenColWidths[0] + resumenColWidths[1], yPos + 3)
+        doc.text("TOTAL", xPos + resumenColWidths[0] + resumenColWidths[1] + resumenColWidths[2], yPos + 3)
+
+        yPos += resumenRowHeight
+
+        // Fila de cantidades
+        doc.setDrawColor(...azulOscuro)
+        doc.setLineWidth(0.1)
+        doc.rect(margin, yPos, resumenTableWidth, resumenRowHeight)
+
+        doc.setFont("helvetica", "normal")
+        doc.setFontSize(5)
+        doc.text("Cantidad de Cargas", xPos, yPos + 3)
+        doc.text(summary.totalPagadas.toString(), xPos + resumenColWidths[0], yPos + 3)
+        doc.text(summary.totalDeuda.toString(), xPos + resumenColWidths[0] + resumenColWidths[1], yPos + 3)
+        doc.text(
+          summary.totalCargas.toString(),
+          xPos + resumenColWidths[0] + resumenColWidths[1] + resumenColWidths[2],
+          yPos + 3,
+        )
+
+        yPos += resumenRowHeight
+
+        // Fila de montos
+        doc.setDrawColor(...azulOscuro)
+        doc.setLineWidth(0.1)
+        doc.rect(margin, yPos, resumenTableWidth, resumenRowHeight)
+
+        doc.setFont("helvetica", "normal")
+        doc.setFontSize(5)
+        doc.text("Monto (Bs)", xPos, yPos + 3)
+        doc.text(summary.montoPagadas.toString(), xPos + resumenColWidths[0], yPos + 3)
+        doc.text(summary.montoDeuda.toString(), xPos + resumenColWidths[0] + resumenColWidths[1], yPos + 3)
+        doc.text(
+          (summary.montoPagadas + summary.montoDeuda).toString(),
+          xPos + resumenColWidths[0] + resumenColWidths[1] + resumenColWidths[2],
+          yPos + 3,
+        )
+
+        yPos += resumenRowHeight + 8
+
+        // Tabla de datos en formato compacto
+        doc.setFont("helvetica", "bold")
+        doc.setFontSize(6)
         doc.text("DETALLE DE CARGAS:", margin, yPos)
         yPos += 5
 
-        // Configuración de la tabla
+        // Configuración de tabla compacta
         const tableWidth = pageWidth - 2 * margin
         const colWidths = [15, 25, 20, 18, 30, 20] // ID, Fecha, Hora, Estado, Usuario, Costo
         const rowHeight = 6
@@ -309,18 +385,16 @@ export default function WaterChargesClient() {
         doc.setFontSize(5)
         doc.setTextColor(...negro)
 
-        let xPos = margin + 1
-        doc.text("ID", xPos, yPos + 4)
-        xPos += colWidths[0]
-        doc.text("FECHA", xPos, yPos + 4)
-        xPos += colWidths[1]
-        doc.text("HORA", xPos, yPos + 4)
-        xPos += colWidths[2]
-        doc.text("ESTADO", xPos, yPos + 4)
-        xPos += colWidths[3]
-        doc.text("USUARIO", xPos, yPos + 4)
-        xPos += colWidths[4]
-        doc.text("COSTO", xPos, yPos + 4)
+        doc.text("ID", margin + 1, yPos + 4)
+        doc.text("FECHA", margin + 1 + colWidths[0], yPos + 4)
+        doc.text("HORA", margin + 1 + colWidths[0] + colWidths[1], yPos + 4)
+        doc.text("ESTADO", margin + 1 + colWidths[0] + colWidths[1] + colWidths[2], yPos + 4)
+        doc.text("NOMBRE", margin + 1 + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3], yPos + 4)
+        doc.text(
+          "COSTO",
+          margin + 1 + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] + colWidths[4],
+          yPos + 4,
+        )
 
         yPos += rowHeight
 
@@ -328,25 +402,10 @@ export default function WaterChargesClient() {
         doc.setFont("helvetica", "normal")
         doc.setFontSize(5)
 
-        filteredData.forEach((charge, index) => {
-          if (yPos > 200) {
-            // Si se acerca al final de la página
-            doc.addPage()
-            yPos = 20
-          }
+        const maxRowsToShow = Math.min(filteredData.length, 12)
+        const dataToShow = filteredData.slice(0, maxRowsToShow)
 
-          const fechaCarga = new Date(charge.fechaHora).toLocaleDateString("es-ES", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "2-digit",
-          })
-          const horaCarga = new Date(charge.fechaHora).toLocaleTimeString("es-ES", {
-            hour: "2-digit",
-            minute: "2-digit",
-          })
-          const usuarioCarga = (charge.usuario?.nombre || "N/A").substring(0, 15)
-          const estadoCarga = charge.estado === "deuda" ? "Pendiente" : "Pagado"
-
+        dataToShow.forEach((item, index) => {
           // Dibujar bordes de la fila
           doc.setDrawColor(...azulOscuro)
           doc.setLineWidth(0.2)
@@ -360,24 +419,43 @@ export default function WaterChargesClient() {
           }
 
           // Contenido de la fila
-          xPos = margin + 1
-          doc.text(charge.id.toString(), xPos, yPos + 4)
-          xPos += colWidths[0]
-          doc.text(fechaCarga, xPos, yPos + 4)
-          xPos += colWidths[1]
-          doc.text(horaCarga, xPos, yPos + 4)
-          xPos += colWidths[2]
-          doc.text(estadoCarga, xPos, yPos + 4)
-          xPos += colWidths[3]
-          doc.text(usuarioCarga, xPos, yPos + 4)
-          xPos += colWidths[4]
-          doc.text(`Bs ${charge.costo || 30}`, xPos, yPos + 4)
+          const fechaCarga = new Date(item.fechaHora).toLocaleDateString("es-ES", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "2-digit",
+          })
+          const horaCarga = new Date(item.fechaHora).toLocaleTimeString("es-ES", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+          const usuarioCarga = (item.usuario?.nombre || "N/A").substring(0, 15)
+          const estadoCarga = item.estado === "deuda" ? "Pendiente" : "Pagado"
+
+          doc.text(item.id.toString(), margin + 1, yPos + 4)
+          doc.text(fechaCarga, margin + 1 + colWidths[0], yPos + 4)
+          doc.text(horaCarga, margin + 1 + colWidths[0] + colWidths[1], yPos + 4)
+          doc.text(estadoCarga, margin + 1 + colWidths[0] + colWidths[1] + colWidths[2], yPos + 4)
+          doc.text(usuarioCarga, margin + 1 + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3], yPos + 4)
+          doc.text(
+            `Bs ${item.costo || 30}`,
+            margin + 1 + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] + colWidths[4],
+            yPos + 4,
+          )
 
           yPos += rowHeight
         })
 
-        // Pie del reporte
-        yPos += 5
+        // Si hay más datos de los que se muestran, indicarlo
+        if (filteredData.length > maxRowsToShow) {
+          yPos += 2
+          doc.setFont("helvetica", "italic")
+          doc.setFontSize(4)
+          doc.text(`... y ${filteredData.length - maxRowsToShow} registros más`, margin, yPos)
+          yPos += 3
+        }
+
+        // Pie del reporte (igual que el recibo)
+        yPos = 200 // Posición fija cerca del final
         doc.setDrawColor(...azulOscuro)
         doc.line(margin, yPos, pageWidth - margin, yPos)
 
@@ -386,7 +464,9 @@ export default function WaterChargesClient() {
         doc.setFontSize(4)
         doc.text("Este reporte es válido como constancia de cargas.", pageWidth / 2, yPos, { align: "center" })
         doc.text("Distribuidora de Agua Los Pinos", pageWidth / 2, yPos + 3, { align: "center" })
-        doc.text(`Generado: ${new Date().toLocaleString()}`, pageWidth / 2, yPos + 6, { align: "center" })
+        doc.text(`Generado: ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: es })}`, pageWidth / 2, yPos + 6, {
+          align: "center",
+        })
 
         // Guardar PDF
         const fileName = showAllTime
@@ -460,25 +540,28 @@ export default function WaterChargesClient() {
 
   return (
     <div className="container mx-auto px-4 pt-20 pb-8 max-w-5xl">
-       <div className="bg-white rounded-lg shadow-md border border-gray-300 mb-6 overflow-hidden">
-          <div className="px-6 py-4">
-            <div className="flex items-center gap-3 justify-center">
-              <div className="w-12 h-12 bg-gradient-to-br from-teal-600 to-teal-800 rounded-full flex items-center justify-center shadow-lg border border-gray-300">
-                <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path d="M12 3C10 3 6 7 6 12C6 16 9 20 12 20C15 20 18 16 18 12C18 7 14 3 12 3Z" strokeWidth="2"/>
-                  <path d="M12 16C14.2091 16 16 14.2091 16 12C16 9.79086 14.2091 8 12 8C9.79086 8 8 9.79086 8 12C8 14.2091 9.79086 16 12 16Z" strokeWidth="2"/>
-                  <path d="M7 10L5 12" strokeWidth="2"/>
-                  <path d="M19 12L17 10" strokeWidth="2"/>
-                  <path d="M12 7V9" strokeWidth="2"/>
-                </svg>
-              </div>
-              <h1 className="text-3xl font-bold text-black tracking-tight">Cargas de Agua</h1>
+      <div className="bg-white rounded-lg shadow-md border border-gray-300 mb-6 overflow-hidden">
+        <div className="px-6 py-4">
+          <div className="flex items-center gap-3 justify-center">
+            <div className="w-12 h-12 bg-gradient-to-br from-teal-600 to-teal-800 rounded-full flex items-center justify-center shadow-lg border border-gray-300">
+              <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M12 3C10 3 6 7 6 12C6 16 9 20 12 20C15 20 18 16 18 12C18 7 14 3 12 3Z" strokeWidth="2" />
+                <path
+                  d="M12 16C14.2091 16 16 14.2091 16 12C16 9.79086 14.2091 8 12 8C9.79086 8 8 9.79086 8 12C8 14.2091 9.79086 16 12 16Z"
+                  strokeWidth="2"
+                />
+                <path d="M7 10L5 12" strokeWidth="2" />
+                <path d="M19 12L17 10" strokeWidth="2" />
+                <path d="M12 7V9" strokeWidth="2" />
+              </svg>
             </div>
+            <h1 className="text-3xl font-bold text-black tracking-tight">Cargas de Agua</h1>
           </div>
-          <div className="h-1 bg-gradient-to-r from-teal-600 to-teal-800"></div>
         </div>
-      
-     <div className="flex items-center mb-6">
+        <div className="h-1 bg-gradient-to-r from-teal-600 to-teal-800"></div>
+      </div>
+
+      <div className="flex items-center mb-6">
         <div className="ml-auto flex gap-2">
           <Button
             onClick={handleDownloadAllChargesPDF}
@@ -493,7 +576,6 @@ export default function WaterChargesClient() {
           </Button>
         </div>
       </div>
-
 
       {/* Resumen de cargas */}
       <div className="mb-8">

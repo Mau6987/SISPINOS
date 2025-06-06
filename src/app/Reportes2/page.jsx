@@ -7,26 +7,7 @@ import autoTable from "jspdf-autotable"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import Navbar from "../Navbar"
-import {
-  FileText,
-  Download,
-  Users,
-  DollarSign,
-  AlertTriangle,
-  Truck,
-  BarChart3,
-  Loader2,
-  CheckCircle,
-  AlertCircle,
-  X,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  RefreshCw,
-  Calendar,
-  Filter,
-  Settings,
-} from "lucide-react"
+import { FileText, Download, Users, DollarSign, AlertTriangle, Truck, BarChart3, Loader2, CheckCircle, AlertCircle, X, ChevronDown, ChevronLeft, ChevronRight, RefreshCw, Calendar, Filter, Settings } from 'lucide-react'
 
 import { Button } from "@/components/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/components/ui/card"
@@ -37,6 +18,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/components
 import { Badge } from "@/components/components/ui/badge"
 import { Checkbox } from "@/components/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/components/ui/select"
+import LogoWithText from "@/components/logo"
 
 // URL de la API
 const API_URL = "https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev"
@@ -281,13 +263,12 @@ export default function ReportesPage() {
     }
   }
 
-  // Función mejorada para exportar reportes a PDF con diseño compacto similar al recibo
+  // Función mejorada para exportar reportes a PDF con diseño similar al recibo de pagos
   const exportReportToPDF = () => {
     if (!reportData) return
 
-    // Create a half-letter sized PDF (5.5" x 8.5")
     const doc = new jsPDF({
-      format: [139.7, 215.9], // Half letter size in mm
+      format: [139.7, 215.9], // Half letter size in mm (igual que el recibo)
       orientation: "portrait",
     })
 
@@ -295,13 +276,13 @@ export default function ReportesPage() {
     const margin = 8
     const currentDate = format(new Date(), "dd/MM/yyyy HH:mm", { locale: es })
 
-    // Colores
+    // Colores (igual que el recibo)
     const azulOscuro = [0, 51, 102]
     const grisClaro = [240, 240, 240]
     const negro = [0, 0, 0]
     const reportConfig = reportTypes.find((r) => r.id === selectedReportType)
 
-    // Encabezado con logo y título
+    // Encabezado con logo y título (igual que el recibo)
     doc.setFillColor(...grisClaro)
     doc.rect(0, 0, pageWidth, 22, "F")
 
@@ -327,243 +308,191 @@ export default function ReportesPage() {
     doc.setTextColor(...negro)
     doc.text(`REPORTE: ${reportConfig?.name.toUpperCase() || "GENERAL"}`, pageWidth / 2, 30, { align: "center" })
 
-    // Información del reporte en formato compacto
+    // Información del reporte en doble columna (similar al recibo)
     let yPos = 38
     const lineHeight = 4
 
     // Dibujar recuadro para la información
     doc.setDrawColor(...azulOscuro)
     doc.setLineWidth(0.3)
-    doc.rect(margin, yPos - 2, pageWidth - 2 * margin, 20)
+    doc.rect(margin, yPos - 2, pageWidth - 2 * margin, 16)
 
-    // Información básica del reporte
+    // Primera columna de información
     doc.setFont("helvetica", "bold")
     doc.setFontSize(6)
 
-    // Primera fila
+    // Columna izquierda
     doc.text("Generado:", margin + 2, yPos + 2)
     doc.setFont("helvetica", "normal")
     doc.text(currentDate, margin + 22, yPos + 2)
 
     doc.setFont("helvetica", "bold")
-    doc.text("Usuario:", pageWidth / 2 + 2, yPos + 2)
+    doc.text("Usuario:", margin + 2, yPos + 6)
     doc.setFont("helvetica", "normal")
-    doc.text(localStorage.getItem("nombreUsuario") || "Sistema", pageWidth / 2 + 18, yPos + 2)
+    const nombreUsuario = localStorage.getItem("nombreUsuario") || localStorage.getItem("username") || "Sistema"
+    const usuarioText = nombreUsuario.length > 20 ? nombreUsuario.substring(0, 20) + "..." : nombreUsuario
+    doc.text(usuarioText, margin + 22, yPos + 6)
 
-    // Segunda fila - Período con fechas completas
+    doc.setFont("helvetica", "bold")
+    doc.text("Tipo:", margin + 2, yPos + 10)
+    doc.setFont("helvetica", "normal")
+    doc.text(reportConfig?.name || "Reporte", margin + 22, yPos + 10)
+
+    // Columna derecha
+    const col2X = pageWidth / 2 + 2
+
     if (reportFechaInicio && reportFechaFin) {
       doc.setFont("helvetica", "bold")
-      doc.text("Período:", margin + 2, yPos + 6)
+      doc.text("Desde:", col2X, yPos + 2)
       doc.setFont("helvetica", "normal")
-      const fechaInicioCompleta = formatDateComplete(reportFechaInicio)
-      const fechaFinCompleta = formatDateComplete(reportFechaFin)
-      const periodoTexto = `${fechaInicioCompleta} al ${fechaFinCompleta}`
+      doc.text(formatDate(reportFechaInicio), col2X + 16, yPos + 2)
 
-      // Si el texto es muy largo, usar formato corto
-      if (periodoTexto.length > 80) {
-        doc.text(`${formatDate(reportFechaInicio)} - ${formatDate(reportFechaFin)}`, margin + 22, yPos + 6)
-      } else {
-        // Dividir en múltiples líneas si es necesario
-        const lineasPeriodo = doc.splitTextToSize(periodoTexto, pageWidth - margin - 24)
-        doc.text(lineasPeriodo, margin + 22, yPos + 6)
-      }
-    }
-
-    // Tercera fila - Filtros aplicados
-    let filtrosTexto = ""
-    if (selectedEstados.length > 0) filtrosTexto += `Estado: ${selectedEstados.join(", ")} `
-    if (selectedRoles.length > 0) filtrosTexto += `Rol: ${selectedRoles.join(", ")} `
-    if (usuarioId && usuarioId !== "todos") {
-      const usuario = usuarios.find((u) => u.id.toString() === usuarioId)
-      filtrosTexto += `Usuario: ${usuario?.nombre || "N/A"}`
-    }
-
-    if (filtrosTexto) {
       doc.setFont("helvetica", "bold")
-      doc.text("Filtros:", margin + 2, yPos + 10)
+      doc.text("Hasta:", col2X, yPos + 6)
       doc.setFont("helvetica", "normal")
-      const filtrosCorto = filtrosTexto.length > 40 ? filtrosTexto.substring(0, 40) + "..." : filtrosTexto
-      doc.text(filtrosCorto, margin + 22, yPos + 10)
+      doc.text(formatDate(reportFechaFin), col2X + 16, yPos + 6)
     }
 
-    // Métricas principales en formato compacto
-    yPos = 62
-    if (reportData.totales) {
-      doc.setFont("helvetica", "bold")
-      doc.setFontSize(6)
-      doc.text("MÉTRICAS PRINCIPALES:", margin, yPos)
-      yPos += 4
+    doc.setFont("helvetica", "bold")
+    doc.text("Registros:", col2X, yPos + 10)
+    doc.setFont("helvetica", "normal")
+    doc.text(tableData.length.toString(), col2X + 20, yPos + 10)
 
-      let metricas = []
+    // Detalle de datos en tabla (similar al recibo)
+    yPos = 58
+    doc.setFont("helvetica", "bold")
+    doc.setFontSize(7)
+    doc.text("DETALLE DEL REPORTE:", margin, yPos)
 
-      switch (selectedReportType) {
-        case "cargas-periodo":
-          metricas = [
-            `Total Cargas: ${reportData.totales.totalCargas || 0}`,
-            `Monto Total: ${formatCurrency(reportData.totales.montoTotal || 0)}`,
-            `Eficiencia: ${((reportData.totales.cargasPagadas / reportData.totales.totalCargas) * 100).toFixed(1)}%`,
-          ]
-          break
+    yPos += 5
 
-        case "cargas-usuario":
-          metricas = [
-            `Usuarios: ${reportData.reporte?.length || 0}`,
-            `Total Cargas: ${reportData.totales.totalCargas || 0}`,
-            `Con Deudas: ${reportData.reporte?.filter((u) => (u.dataValues?.cargasEnDeuda || u.cargasEnDeuda) > 0).length || 0}`,
-          ]
-          break
+    // Configuración de la tabla
+    const tableWidth = pageWidth - 2 * margin
+    let colWidths = []
+    let headers = []
 
-        case "pagos-periodo":
-          metricas = [
-            `Total Pagos: ${reportData.totales.totalPagos || 0}`,
-            `Monto Total: ${formatCurrency(reportData.totales.montoTotal || 0)}`,
-            `Tasa Éxito: ${((reportData.totales.pagosActivos / reportData.totales.totalPagos) * 100).toFixed(1)}%`,
-          ]
-          break
-
-        case "deudas":
-          metricas = [
-            `Usuarios con Deudas: ${reportData.reporte?.length || 0}`,
-            `Total Adeudado: ${formatCurrency(reportData.totales.montoTotalDeuda || 0)}`,
-            `Promedio: ${formatCurrency((reportData.totales.montoTotalDeuda || 0) / (reportData.reporte?.length || 1))}`,
-          ]
-          break
-      }
-
-      doc.setFont("helvetica", "normal")
-      doc.setFontSize(5)
-      metricas.forEach((metrica, index) => {
-        const xPos = margin + 2 + (index % 2) * (pageWidth / 2 - margin)
-        if (index % 2 === 0 && index > 0) yPos += 4
-        doc.text(`• ${metrica}`, xPos, yPos)
-      })
-      yPos += 8
+    switch (selectedReportType) {
+      case "cargas-periodo":
+        headers = ["PERÍODO", "CARGAS", "MONTO", "PAGADAS", "DEUDA"]
+        colWidths = [30, 18, 25, 18, 18]
+        break
+      case "cargas-usuario":
+        headers = ["ROL", "USUARIO", "CARGAS", "MONTO", "DEUDA"]
+        colWidths = [18, 30, 18, 25, 18]
+        break
+      case "pagos-periodo":
+        headers = ["PERÍODO", "PAGOS", "MONTO", "ACTIVOS", "ANULADOS"]
+        colWidths = [30, 18, 25, 18, 18]
+        break
+      case "deudas":
+        headers = ["ROL", "USUARIO", "CARGAS", "MONTO"]
+        colWidths = [20, 35, 20, 25]
+        break
     }
 
-    // Tabla de datos en formato compacto
-    const tableData = getCurrentTableData()
-    if (tableData.length > 0) {
-      doc.setFont("helvetica", "bold")
-      doc.setFontSize(6)
-      doc.text("DETALLE DE DATOS:", margin, yPos)
-      yPos += 5
+    const rowHeight = 7
 
-      // Configuración de tabla compacta
-      const tableWidth = pageWidth - 2 * margin
-      let colWidths = []
-      let headers = []
+    // Encabezados de la tabla
+    doc.setFillColor(...grisClaro)
+    doc.rect(margin, yPos, tableWidth, rowHeight, "F")
 
-      switch (selectedReportType) {
-        case "cargas-periodo":
-          headers = ["Período", "Cargas", "Monto", "Pagadas", "Deuda"]
-          colWidths = [30, 18, 25, 18, 18]
-          break
-        case "cargas-usuario":
-          headers = ["Usuario", "Rol", "Cargas", "Monto", "Deuda"]
-          colWidths = [35, 15, 18, 25, 18]
-          break
-        case "pagos-periodo":
-          headers = ["Período", "Pagos", "Monto", "Activos", "Anulados"]
-          colWidths = [30, 18, 25, 18, 18]
-          break
-        case "deudas":
-          headers = ["Usuario", "Rol", "Cargas", "Monto"]
-          colWidths = [40, 20, 20, 25]
-          break
-      }
+    doc.setDrawColor(...azulOscuro)
+    doc.setLineWidth(0.3)
+    doc.rect(margin, yPos, tableWidth, rowHeight)
 
-      const rowHeight = 6
+    doc.setFont("helvetica", "bold")
+    doc.setFontSize(5)
+    doc.setTextColor(...negro)
 
-      // Encabezados
-      doc.setFillColor(...grisClaro)
-      doc.rect(margin, yPos, tableWidth, rowHeight, "F")
+    let xPos = margin + 1
+    headers.forEach((header, i) => {
+      doc.text(header, xPos, yPos + 4)
+      xPos += colWidths[i]
+    })
+
+    yPos += rowHeight
+
+    // Filas de datos
+    doc.setFont("helvetica", "normal")
+    doc.setFontSize(5)
+
+    const maxRowsToShow = Math.min(tableData.length, 12)
+    const dataToShow = tableData.slice(0, maxRowsToShow)
+
+    dataToShow.forEach((item, index) => {
+      // Dibujar bordes de la fila
       doc.setDrawColor(...azulOscuro)
       doc.setLineWidth(0.2)
       doc.rect(margin, yPos, tableWidth, rowHeight)
 
-      doc.setFont("helvetica", "bold")
-      doc.setFontSize(5)
-      let xPos = margin + 1
-      headers.forEach((header, i) => {
-        doc.text(header, xPos, yPos + 4)
-        xPos += colWidths[i]
+      // Líneas verticales
+      let currentX = margin
+      for (let i = 0; i < colWidths.length - 1; i++) {
+        currentX += colWidths[i]
+        doc.line(currentX, yPos, currentX, yPos + rowHeight)
+      }
+
+      // Contenido de la fila
+      xPos = margin + 1
+      let rowData = []
+
+      switch (selectedReportType) {
+        case "cargas-periodo":
+          rowData = [
+            (item.dataValues?.periodo || item.periodo).substring(0, 12),
+            (item.dataValues?.totalCargas || item.totalCargas).toString(),
+            formatCurrency(item.dataValues?.montoTotal || item.montoTotal).substring(0, 8),
+            (item.dataValues?.cargasPagadas || item.cargasPagadas).toString(),
+            (item.dataValues?.cargasEnDeuda || item.cargasEnDeuda).toString(),
+          ]
+          break
+        case "cargas-usuario":
+          rowData = [
+            item.rol.substring(0, 8),
+            item.nombre.substring(0, 15),
+            (item.dataValues?.totalCargas || item.totalCargas).toString(),
+            formatCurrency(item.dataValues?.montoTotal || item.montoTotal).substring(0, 8),
+            (item.dataValues?.cargasEnDeuda || item.cargasEnDeuda).toString(),
+          ]
+          break
+        case "pagos-periodo":
+          rowData = [
+            (item.dataValues?.periodo || item.periodo).substring(0, 12),
+            (item.dataValues?.totalPagos || item.totalPagos).toString(),
+            formatCurrency(item.dataValues?.montoTotal || item.montoTotal).substring(0, 8),
+            (item.dataValues?.pagosActivos || item.pagosActivos).toString(),
+            (item.dataValues?.pagosAnulados || item.pagosAnulados).toString(),
+          ]
+          break
+        case "deudas":
+          rowData = [
+            item.rol.substring(0, 8),
+            item.nombre.substring(0, 18),
+            (item.dataValues?.cargasEnDeuda || item.cargasEnDeuda).toString(),
+            formatCurrency(item.dataValues?.montoDeuda || item.montoDeuda).substring(0, 8),
+          ]
+          break
+      }
+
+      rowData.forEach((data, j) => {
+        doc.text(data, xPos, yPos + 4)
+        xPos += colWidths[j]
       })
 
       yPos += rowHeight
+    })
 
-      // Datos (máximo 15 filas para mantener el formato compacto)
-      const maxRows = Math.min(tableData.length, 15)
-      doc.setFont("helvetica", "normal")
+    // Si hay más datos de los que se muestran, indicarlo
+    if (tableData.length > maxRowsToShow) {
+      yPos += 2
+      doc.setFont("helvetica", "italic")
       doc.setFontSize(4)
-
-      for (let i = 0; i < maxRows; i++) {
-        const item = tableData[i]
-
-        // Dibujar fila
-        doc.setDrawColor(...azulOscuro)
-        doc.setLineWidth(0.1)
-        doc.rect(margin, yPos, tableWidth, rowHeight)
-
-        xPos = margin + 1
-        let rowData = []
-
-        switch (selectedReportType) {
-          case "cargas-periodo":
-            rowData = [
-              (item.dataValues?.periodo || item.periodo).substring(0, 12),
-              (item.dataValues?.totalCargas || item.totalCargas).toString(),
-              formatCurrency(item.dataValues?.montoTotal || item.montoTotal).substring(0, 8),
-              (item.dataValues?.cargasPagadas || item.cargasPagadas).toString(),
-              (item.dataValues?.cargasEnDeuda || item.cargasEnDeuda).toString(),
-            ]
-            break
-          case "cargas-usuario":
-            rowData = [
-              item.nombre.substring(0, 15),
-              item.rol.substring(0, 8),
-              (item.dataValues?.totalCargas || item.totalCargas).toString(),
-              formatCurrency(item.dataValues?.montoTotal || item.montoTotal).substring(0, 8),
-              (item.dataValues?.cargasEnDeuda || item.cargasEnDeuda).toString(),
-            ]
-            break
-          case "pagos-periodo":
-            rowData = [
-              (item.dataValues?.periodo || item.periodo).substring(0, 12),
-              (item.dataValues?.totalPagos || item.totalPagos).toString(),
-              formatCurrency(item.dataValues?.montoTotal || item.montoTotal).substring(0, 8),
-              (item.dataValues?.pagosActivos || item.pagosActivos).toString(),
-              (item.dataValues?.pagosAnulados || item.pagosAnulados).toString(),
-            ]
-            break
-          case "deudas":
-            rowData = [
-              item.nombre.substring(0, 18),
-              item.rol.substring(0, 8),
-              (item.dataValues?.cargasEnDeuda || item.cargasEnDeuda).toString(),
-              formatCurrency(item.dataValues?.montoDeuda || item.montoDeuda).substring(0, 8),
-            ]
-            break
-        }
-
-        rowData.forEach((data, j) => {
-          doc.text(data, xPos, yPos + 4)
-          xPos += colWidths[j]
-        })
-
-        yPos += rowHeight
-      }
-
-      // Indicar si hay más datos
-      if (tableData.length > maxRows) {
-        yPos += 2
-        doc.setFont("helvetica", "italic")
-        doc.setFontSize(4)
-        doc.text(`... y ${tableData.length - maxRows} registros más`, margin, yPos)
-      }
+      doc.text(`... y ${tableData.length - maxRowsToShow} registros más`, margin, yPos)
+      yPos += 3
     }
 
-    // Pie del reporte
-    yPos = 200 // Posición fija cerca del final
+    // Pie del reporte (igual que el recibo)
+    yPos += 5
     doc.setDrawColor(...azulOscuro)
     doc.line(margin, yPos, pageWidth - margin, yPos)
 
@@ -572,8 +501,9 @@ export default function ReportesPage() {
     doc.setFontSize(4)
     doc.text("Este reporte es generado automáticamente por el sistema.", pageWidth / 2, yPos, { align: "center" })
     doc.text("Distribuidora de Agua Los Pinos", pageWidth / 2, yPos + 3, { align: "center" })
-    doc.text(`Página 1 - ${currentDate}`, pageWidth / 2, yPos + 6, { align: "center" })
+    doc.text(`Generado: ${currentDate}`, pageWidth / 2, yPos + 6, { align: "center" })
 
+    // Guardar PDF
     doc.save(`reporte_${selectedReportType}_${format(new Date(), "yyyy-MM-dd")}.pdf`)
   }
 
@@ -939,37 +869,6 @@ export default function ReportesPage() {
             </div>
 
             {/* Información del reporte y estadísticas */}
-            {reportData && reportData.totales && (
-              <Card className="mb-4 shadow-md border-2 border-gray-300 rounded-lg">
-                <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-800 text-white pb-3">
-                  <CardTitle className="text-white flex items-center text-base">
-                    <FileText className="mr-2 h-4 w-4" />
-                    {reportTypes.find((r) => r.id === selectedReportType)?.name} - Resumen
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-3">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                    {Object.entries(reportData.totales).map(([key, value]) => (
-                      <div key={key} className="text-center">
-                        <div className="bg-gray-100 p-2 rounded-t-md">
-                          <p className="font-semibold text-gray-800 text-xs">
-                            {key.replace(/([A-Z])/g, " $1").replace(/^./, (str) => str.toUpperCase())}
-                          </p>
-                        </div>
-                        <p className="text-lg font-bold py-2">
-                          {typeof value === "number" && (key.includes("monto") || key.includes("Monto"))
-                            ? formatCurrency(value)
-                            : typeof value === "number" && key.includes("porcentaje")
-                              ? `${value.toFixed(2)}%`
-                              : value}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
             {/* Tabla de resultados */}
             {tableData.length > 0 && (
               <Card className="border-2 border-gray-300 rounded-lg">
@@ -993,8 +892,8 @@ export default function ReportesPage() {
                         )}
                         {selectedReportType === "cargas-usuario" && (
                           <>
-                            <TableHead className="font-bold text-white text-xs">Usuario</TableHead>
                             <TableHead className="font-bold text-white text-xs">Rol</TableHead>
+                            <TableHead className="font-bold text-white text-xs">Usuario</TableHead>
                             <TableHead className="font-bold text-white text-xs">Total Cargas</TableHead>
                             <TableHead className="font-bold text-white text-xs">Monto Total</TableHead>
                             <TableHead className="font-bold text-white text-xs">Cargas Pagadas</TableHead>
@@ -1003,8 +902,8 @@ export default function ReportesPage() {
                         )}
                         {selectedReportType === "deudas" && (
                           <>
-                            <TableHead className="font-bold text-white text-xs">Usuario</TableHead>
                             <TableHead className="font-bold text-white text-xs">Rol</TableHead>
+                            <TableHead className="font-bold text-white text-xs">Usuario</TableHead>
                             <TableHead className="font-bold text-white text-xs">Cargas en Deuda</TableHead>
                             <TableHead className="font-bold text-white text-xs">Monto Deuda</TableHead>
                           </>
@@ -1052,7 +951,6 @@ export default function ReportesPage() {
                           )}
                           {selectedReportType === "cargas-usuario" && (
                             <>
-                              <TableCell className="font-medium text-sm">{item.nombre}</TableCell>
                               <TableCell className="text-sm">
                                 <Badge
                                   variant={item.rol === "propietario" ? "default" : "secondary"}
@@ -1061,6 +959,7 @@ export default function ReportesPage() {
                                   {item.rol}
                                 </Badge>
                               </TableCell>
+                              <TableCell className="font-medium text-sm">{item.nombre}</TableCell>
                               <TableCell className="text-center text-sm">
                                 {item.dataValues?.totalCargas || item.totalCargas}
                               </TableCell>
@@ -1102,7 +1001,6 @@ export default function ReportesPage() {
                           )}
                           {selectedReportType === "deudas" && (
                             <>
-                              <TableCell className="font-medium text-sm">{item.nombre}</TableCell>
                               <TableCell className="text-sm">
                                 <Badge
                                   variant={item.rol === "propietario" ? "default" : "secondary"}
@@ -1111,6 +1009,7 @@ export default function ReportesPage() {
                                   {item.rol}
                                 </Badge>
                               </TableCell>
+                              <TableCell className="font-medium text-sm">{item.nombre}</TableCell>
                               <TableCell className="text-center text-red-600 text-sm">
                                 {item.dataValues?.cargasEnDeuda || item.cargasEnDeuda}
                               </TableCell>

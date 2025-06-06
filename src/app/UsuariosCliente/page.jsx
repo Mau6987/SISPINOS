@@ -522,13 +522,25 @@ export default function ClientManagementOffline() {
   return (
     <NetworkStatusHandler onOffline={() => console.log("Modo offline activado")} onOnline={() => fetchData()}>
       <div className="min-h-screen bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <Toaster />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-8">
 
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
-            <h1 className="text-xl font-bold">Gestión de Clientes</h1>
-            <OfflineIndicator />
+          {/* Header mejorado con diseño atractivo */}
+          <div className="bg-white rounded-xl shadow-lg border border-gray-200 mb-6 overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-8">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div className="text-center sm:text-left">
+                  <h1 className="text-3xl font-bold text-white mb-2">Gestión de Clientes</h1>
+                  <p className="text-blue-100 text-lg">Administra usuarios, tarjetas RFID y estados de cuenta</p>
+                </div>
+                <div className="flex justify-center sm:justify-end w-full sm:w-auto">
+                  <OfflineIndicator />
+                </div>
+              </div>
+            </div>
+            <div className="h-1 bg-gradient-to-r from-blue-400 to-indigo-500"></div>
           </div>
+
+          <Toaster />
 
           <InstallPrompt />
           <SyncManagerEnhanced onSync={fetchData} />

@@ -2,14 +2,13 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { User, Mail, CreditCard, UserCircle, Edit, Save, X, Loader2, Calendar, Shield, Clock } from "lucide-react"
+import { User, Mail, CreditCard, UserCircle, Edit, Save, X, Loader2, Clock } from "lucide-react"
 
 import { Button } from "@/components/components/ui/button"
 import { Input } from "@/components/components/ui/input"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/components/ui/card"
 import { Avatar, AvatarFallback } from "@/components/components/ui/avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/components/ui/tabs"
-import { Badge } from "@/components/components/ui/badge"
 import { Separator } from "@/components/components/ui/separator"
 import { Alert, AlertDescription } from "@/components/components/ui/alert"
 import { toast } from "@/components/hooks/use-toast"
@@ -246,12 +245,12 @@ export default function ProfilePage() {
     <NetworkStatusHandler onOffline={() => console.log("Modo offline activado")} onOnline={() => fetchProfile()}>
       <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 py-20 px-4">
         <div className="max-w-5xl mx-auto">
-          <div className="mb-8 text-center flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-800">Mi Perfil</h1>
-              <p className="text-gray-600 mt-2">Gestiona tu información personal</p>
+          <div className="mb-8 text-center">
+            <h1 className="text-3xl font-bold text-gray-800">Mi Perfil</h1>
+            <p className="text-gray-600 mt-2">Gestiona tu información personal</p>
+            <div className="mt-4 flex justify-center">
+              <OfflineIndicator />
             </div>
-            <OfflineIndicator />
           </div>
 
           <InstallPrompt />
@@ -299,38 +298,13 @@ export default function ProfilePage() {
                   </div>
                 </div>
               </Card>
-
-              <Card className="shadow-md border-gray-200 mt-6">
-                <CardHeader>
-                  <CardTitle className="text-lg">Información de Cuenta</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center text-gray-600">
-                        <Shield className="h-4 w-4 mr-2" />
-                        <span className="text-sm">Estado de cuenta</span>
-                      </div>
-                      <Badge className="bg-green-100 text-green-800 border-green-200">Activa</Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center text-gray-600">
-                        <Calendar className="h-4 w-4 mr-2" />
-                        <span className="text-sm">Miembro desde</span>
-                      </div>
-                      <span className="text-sm text-gray-700">Enero 2023</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
             </div>
 
             {/* Columna derecha - Edición de perfil y pestañas */}
             <div className="lg:col-span-2">
               <Tabs defaultValue="profile" className="w-full">
-                <TabsList className="grid grid-cols-2 mb-6">
+                <TabsList className="grid grid-cols-1 mb-6">
                   <TabsTrigger value="profile">Perfil</TabsTrigger>
-                  <TabsTrigger value="activity">Actividad</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="profile">
@@ -452,51 +426,6 @@ export default function ProfilePage() {
                         </Button>
                       </CardFooter>
                     )}
-                  </Card>
-                </TabsContent>
-
-                <TabsContent value="activity">
-                  <Card className="shadow-md border-gray-200">
-                    <CardHeader>
-                      <CardTitle>Actividad Reciente</CardTitle>
-                      <CardDescription>Historial de actividades en el sistema</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-6">
-                        <div className="flex items-start space-x-4">
-                          <div className="bg-blue-100 p-2 rounded-full">
-                            <User className="h-5 w-5 text-blue-600" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-sm font-medium">Actualización de perfil</p>
-                            <p className="text-xs text-gray-500">Actualizaste tu información personal</p>
-                            <p className="text-xs text-gray-400 mt-1">Hace 2 días</p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-start space-x-4">
-                          <div className="bg-green-100 p-2 rounded-full">
-                            <Shield className="h-5 w-5 text-green-600" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-sm font-medium">Inicio de sesión exitoso</p>
-                            <p className="text-xs text-gray-500">Accediste a tu cuenta desde un nuevo dispositivo</p>
-                            <p className="text-xs text-gray-400 mt-1">Hace 5 días</p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-start space-x-4">
-                          <div className="bg-purple-100 p-2 rounded-full">
-                            <Mail className="h-5 w-5 text-purple-600" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-sm font-medium">Correo electrónico verificado</p>
-                            <p className="text-xs text-gray-500">Verificaste tu dirección de correo electrónico</p>
-                            <p className="text-xs text-gray-400 mt-1">Hace 2 semanas</p>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
                   </Card>
                 </TabsContent>
               </Tabs>

@@ -2,7 +2,18 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { ChevronLeft, ChevronRight, Eye, FileText, CreditCard, Filter, User, Calendar, Shield, WifiOff } from 'lucide-react'
+import {
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  FileText,
+  CreditCard,
+  Filter,
+  User,
+  Calendar,
+  Shield,
+  WifiOff,
+} from "lucide-react"
 
 import { Button } from "@/components/components/ui/button"
 import { Input } from "@/components/components/ui/input"
@@ -14,15 +25,16 @@ import { Badge } from "@/components/components/ui/badge"
 import { Label } from "@/components/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/components/ui/card"
 import { Toaster } from "@/components/components/ui/toaster"
-
-// Importar componentes PWA
-import OfflineIndicator from "@/components/pwa-features/offline-indicator"
 import NetworkStatusHandler from "@/components/pwa-features/network-status-handler"
 import InstallPrompt from "@/components/pwa-features/install-prompt"
 import CacheIndicator from "@/components/pwa-features/cache-indicator"
-import ResponsiveContainer from "@/components/responsive-container"
 import { usePWAFeatures } from "../../hooks/use-pwa-features"
-import { saveToIndexedDB, getFromIndexedDB, registerSyncRequest, initializeBackgroundSync } from "../../utils/pwa-helpers"
+import {
+  saveToIndexedDB,
+  getFromIndexedDB,
+  registerSyncRequest,
+  initializeBackgroundSync,
+} from "../../utils/pwa-helpers"
 import BackgroundSyncEnhanced from "@/components/pwa-features/background-sync"
 import SyncManagerEnhanced from "@/components/pwa-features/sync-manager"
 
@@ -523,22 +535,23 @@ export default function ClientManagementOffline() {
     <NetworkStatusHandler onOffline={() => console.log("Modo offline activado")} onOnline={() => fetchData()}>
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-8">
-
-          {/* Header mejorado con diseño atractivo */}
-          <div className="bg-white rounded-xl shadow-lg border border-gray-200 mb-6 overflow-hidden">
-            <div className="bg-gradient-to-r from-slate-800 to-slate-900 px-6 py-8">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div className="text-center sm:text-left">
-                  <h1 className="text-3xl font-bold text-white mb-2 tracking-tight">Administración de Clientes</h1>
-                  <p className="text-slate-300 text-lg font-medium">Sistema integral de gestión de usuarios y control de acceso</p>
-                </div>
-                <div className="flex justify-center sm:justify-end w-full sm:w-auto">
-                  <OfflineIndicator />
-                </div>
+          {/* Header mejorado con diseño premium minimalista */}
+       <div className="bg-white rounded-lg shadow-md border border-gray-300 mb-6 overflow-hidden">
+        <div className="px-6 py-4">
+          <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
+            <div className="text-center flex items-center gap-3">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-700 to-blue-900 rounded-full flex items-center justify-center shadow-lg border border-gray-300">
+                <User className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-black mb-0 tracking-tight">Gestión de Clientes</h1>
               </div>
             </div>
-            <div className="h-1 bg-gradient-to-r from-slate-600 to-slate-700"></div>
           </div>
+        </div>
+        <div className="h-1 bg-gradient-to-r from-blue-700 to-blue-900"></div>
+      </div>
+
 
           <Toaster />
 

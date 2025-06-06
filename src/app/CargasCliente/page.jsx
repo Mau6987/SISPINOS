@@ -460,22 +460,40 @@ export default function WaterChargesClient() {
 
   return (
     <div className="container mx-auto px-4 pt-20 pb-8 max-w-5xl">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Cargas de Agua</h1>
-        <div className="flex gap-2">
+       <div className="bg-white rounded-lg shadow-md border border-gray-300 mb-6 overflow-hidden">
+          <div className="px-6 py-4">
+            <div className="flex items-center gap-3 justify-center">
+              <div className="w-12 h-12 bg-gradient-to-br from-teal-600 to-teal-800 rounded-full flex items-center justify-center shadow-lg border border-gray-300">
+                <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path d="M12 3C10 3 6 7 6 12C6 16 9 20 12 20C15 20 18 16 18 12C18 7 14 3 12 3Z" strokeWidth="2"/>
+                  <path d="M12 16C14.2091 16 16 14.2091 16 12C16 9.79086 14.2091 8 12 8C9.79086 8 8 9.79086 8 12C8 14.2091 9.79086 16 12 16Z" strokeWidth="2"/>
+                  <path d="M7 10L5 12" strokeWidth="2"/>
+                  <path d="M19 12L17 10" strokeWidth="2"/>
+                  <path d="M12 7V9" strokeWidth="2"/>
+                </svg>
+              </div>
+              <h1 className="text-3xl font-bold text-black tracking-tight">Cargas de Agua</h1>
+            </div>
+          </div>
+          <div className="h-1 bg-gradient-to-r from-teal-600 to-teal-800"></div>
+        </div>
+      
+     <div className="flex items-center mb-6">
+        <div className="ml-auto flex gap-2">
           <Button
             onClick={handleDownloadAllChargesPDF}
             variant="outline"
             className="text-green-600 hover:text-green-800 hover:bg-green-50 border-green-300"
           >
             <Download className="mr-2 h-4 w-4" />
-            Descargar PDF
+            Descargar datos en PDF
           </Button>
           <Button onClick={() => setShowFilterDialog(true)}>
             <Filter className="mr-2 h-4 w-4" /> Filtros
           </Button>
         </div>
       </div>
+
 
       {/* Resumen de cargas */}
       <div className="mb-8">

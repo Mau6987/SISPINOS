@@ -506,10 +506,22 @@ export default function UserManagementEnhanced() {
       <ResponsiveContainer className="max-w-6xl mx-auto mt-12">
         <Toaster />
 
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
-          <h1 className="text-xl font-bold">Gestión de Usuarios</h1>
-          <OfflineIndicator />
+       <div className="bg-white rounded-lg shadow-md border border-gray-300 mb-6 overflow-hidden">
+        <div className="px-6 py-4">
+          <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
+            <div className="text-center flex items-center gap-3">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-700 to-blue-900 rounded-full flex items-center justify-center shadow-lg border border-gray-300">
+                <User className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-black mb-0 tracking-tight">Gestioión de Usuarios</h1>
+              </div>
+            </div>
+          </div>
         </div>
+        <div className="h-1 bg-gradient-to-r from-blue-700 to-blue-900"></div>
+      </div>
+
 
         <InstallPrompt />
         <SyncManagerEnhanced onSync={fetchData} />

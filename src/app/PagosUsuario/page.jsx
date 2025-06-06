@@ -23,6 +23,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "../../components/components
 import { Label } from "../../components/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/components/ui/tabs"
 import { Checkbox } from "../../components/components/ui/checkbox"
+import LogoWithText from '@/components/logo'; // ajusta la ruta si está en otra carpeta
 
 // Importar componentes PWA
 import OfflineIndicator from "@/components/pwa-features/offline-indicator"
@@ -743,10 +744,23 @@ export default function UsuarioDetalles() {
   return (
     <NetworkStatusHandler onOffline={() => console.log("Modo offline activado")} onOnline={() => fetchUsuarios()}>
       <div className="container mx-auto px-4 py-8 mt-16 max-w-5xl">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">Pago por usuario</h1>
-          <OfflineIndicator />
+       <div className="bg-white rounded-lg shadow-md border border-gray-300 mb-6 overflow-hidden">
+    <div className="px-6 py-4">
+      <div className="flex items-center gap-3 justify-center">
+        <div className="w-12 h-12 bg-gradient-to-br from-green-600 to-green-800 rounded-full flex items-center justify-center shadow-lg border border-gray-300">
+          <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M12 8V6M12 6V4M12 6H10M12 6H14" strokeWidth="2"/>
+            <path d="M17 10H19C20.1046 10 21 10.8954 21 12V19C21 20.1046 20.1046 21 19 21H5C3.89543 21 3 20.1046 3 19V12C3 10.8954 3.89543 10 5 10H7" strokeWidth="1.5"/>
+            <path d="M12 15C13.6569 15 15 13.6569 15 12C15 10.3431 13.6569 9 12 9C10.3431 9 9 10.3431 9 12C9 13.6569 10.3431 15 12 15Z" strokeWidth="1.5"/>
+          </svg>
         </div>
+        <h1 className="text-3xl font-bold text-black tracking-tight">Pago por usuario</h1>
+      </div>
+    </div>
+    <div className="h-1 bg-gradient-to-r from-green-600 to-green-800"></div>
+  </div>
+<LogoWithText logoSize="h-20 w-20" textSize="text-1l" />
+
 
         <InstallPrompt />
         <SyncManagerEnhanced

@@ -478,17 +478,35 @@ export default function OwnerDriversTable() {
 
   return (
     <div className="container mx-auto px-4 pt-20 pb-8 max-w-5xl">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Conductores Asociados</h1>
-        <Button
-          onClick={handleDownloadDriversPDF}
-          variant="outline"
-          className="text-green-600 hover:text-green-800 hover:bg-green-50 border-green-300"
-        >
-          <Download className="mr-2 h-4 w-4" />
-          Descargar PDF
-        </Button>
-      </div>
+        <div className="bg-white rounded-lg shadow-md border border-gray-300 mb-6 overflow-hidden">
+          <div className="px-6 py-4">
+            <div className="flex items-center gap-3 justify-center">
+              <div className="w-12 h-12 bg-gradient-to-br from-red-600 to-red-800 rounded-full flex items-center justify-center shadow-lg border border-gray-300">
+                <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path d="M17 21V19C17 17.8954 16.1046 17 15 17H9C7.89543 17 7 17.8954 7 19V21" strokeWidth="2"/>
+                  <path d="M12 12C14.2091 12 16 10.2091 16 8C16 5.79086 14.2091 4 12 4C9.79086 4 8 5.79086 8 8C8 10.2091 9.79086 12 12 12Z" strokeWidth="2"/>
+                  <path d="M12 15L14 17" strokeWidth="2"/>
+                  <path d="M12 15L10 17" strokeWidth="2"/>
+                  <path d="M18 12L20 10" strokeWidth="2"/>
+                  <path d="M6 12L4 10" strokeWidth="2"/>
+                </svg>
+              </div>
+              <h1 className="text-3xl font-bold text-black tracking-tight">Conductores Asociados</h1>
+            </div>
+          </div>
+          <div className="h-1 bg-gradient-to-r from-red-600 to-red-800"></div>
+        </div>
+     <div className="flex justify-end items-center mb-6">
+      <Button
+        onClick={handleDownloadDriversPDF}
+        variant="outline"
+        className="text-green-600 hover:text-green-800 hover:bg-green-50 border-green-300"
+      >
+        <Download className="mr-2 h-4 w-4" />
+        Descargar PDF
+      </Button>
+    </div>
+
 
       {/* Resumen de conductores */}
       <div className="mb-8">
@@ -524,12 +542,12 @@ export default function OwnerDriversTable() {
 
               <div className="text-center">
                 <div className="bg-purple-100 p-2 rounded-t-md">
-                  <p className="font-semibold text-purple-800">Gestión</p>
+                  <p className="font-semibold text-purple-800">Acciones</p>
                 </div>
                 <div className="border border-t-0 border-purple-200 rounded-b-md p-3">
                   <div className="flex items-center justify-center gap-2">
                     <FileText className="h-5 w-5 text-purple-600" />
-                    <p className="text-sm font-medium">Control Total</p>
+                    <p className="text-sm font-medium">Visualizaciones</p>
                   </div>
                 </div>
               </div>

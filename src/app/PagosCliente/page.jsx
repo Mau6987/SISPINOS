@@ -29,7 +29,7 @@ import { Separator } from "@/components/components/ui/separator"
 
 const ITEMS_PER_PAGE = 10
 
-export default function OwnerPaymentsTable() {
+export default function clientPaymentsTable() {
   const [windowWidth, setWindowWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 0)
   const [data, setData] = useState([])
   const [filteredData, setFilteredData] = useState([])
@@ -316,13 +316,35 @@ export default function OwnerPaymentsTable() {
   }
 
   return (
+    
     <div className="container mx-auto px-4 pt-20 pb-8 max-w-6xl">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Pagos</h1>
-        <Button onClick={() => setShowFilterDialog(true)}>
-          <Filter className="mr-2 h-4 w-4" /> Filtrar por Fecha
-        </Button>
+
+    <div className="bg-white rounded-lg shadow-md border border-gray-300 mb-6 overflow-hidden">
+      <div className="px-6 py-4">
+        <div className="flex items-center gap-3 justify-center">
+          <div className="w-12 h-12 bg-gradient-to-br from-green-600 to-green-800 rounded-full flex items-center justify-center shadow-lg border border-gray-300">
+            <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M17 8V6C17 4.89543 16.1046 4 15 4H9C7.89543 4 7 4.89543 7 6V8" strokeWidth="2"/>
+              <path d="M3 10V14C3 15.1046 3.89543 16 5 16H19C20.1046 16 21 15.1046 21 14V10C21 8.89543 20.1046 8 19 8H5C3.89543 8 3 8.89543 3 10Z" strokeWidth="2"/>
+              <path d="M12 12C13.1046 12 14 11.1046 14 10C14 8.89543 13.1046 8 12 8C10.8954 8 10 8.89543 10 10C10 11.1046 10.8954 12 12 12Z" strokeWidth="2"/>
+              <path d="M12 12V14" strokeWidth="2"/>
+            </svg>
+          </div>
+          <h1 className="text-3xl font-bold text-black tracking-tight">Pagos</h1>
+        </div>
       </div>
+      <div className="h-1 bg-gradient-to-r from-green-600 to-green-800"></div>
+    </div>
+
+
+      <div className="flex items-center mb-6">
+        <div className="ml-auto">
+          <Button onClick={() => setShowFilterDialog(true)}>
+            <Filter className="mr-2 h-4 w-4" /> Filtrar por Fecha
+          </Button>
+        </div>
+      </div>
+
 
       {/* Resumen de pagos */}
       <div className="mb-8">

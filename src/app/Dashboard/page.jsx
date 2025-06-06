@@ -534,23 +534,27 @@ export default function DashboardPage() {
           />
 
           {/* Header */}
-          <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3 mb-4">
-            <div className="flex items-center gap-4">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-800">Dashboard Ejecutivo</h1>
-                <p className="text-gray-600 text-sm">Distribuidora de Agua Los Pinos</p>
+          
+            <div className="bg-white rounded-lg shadow-md border border-gray-300 mb-6 overflow-hidden">
+              <div className="px-6 py-4">
+                <div className="flex items-center gap-3 justify-center">
+                  <div className="w-12 h-12 bg-gradient-to-br from-cyan-600 to-cyan-800 rounded-full flex items-center justify-center shadow-lg border border-gray-300">
+                    <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <path d="M3 12H7M7 12L11 6M7 12L11 18" strokeWidth="2"/>
+                      <path d="M14 6H18M18 6L22 12M18 6L22 0" strokeWidth="2"/>
+                      <path d="M14 18H18M18 18L22 12M18 18L22 24" strokeWidth="2"/>
+                      <circle cx="12" cy="12" r="3" strokeWidth="2"/>
+                      <path d="M12 3V5" strokeWidth="2"/>
+                      <path d="M12 19V21" strokeWidth="2"/>
+                    </svg>
+                  </div>
+                  <h1 className="text-3xl font-bold text-black tracking-tight">Dashboard Ejecutivo</h1>
+                 
+                </div>
+                
               </div>
-              <OfflineIndicator />
+              <div className="h-1 bg-gradient-to-r from-cyan-600 to-cyan-800"></div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {dashboardData && (
-                <Button onClick={exportDashboardToPDF} className="bg-slate-900 hover:bg-slate-950" size="sm">
-                  <Download className="mr-2 h-4 w-4" />
-                  Exportar PDF
-                </Button>
-              )}
-            </div>
-          </div>
 
           {/* Indicador de datos en caché */}
           {usingCachedData && (
@@ -567,7 +571,9 @@ export default function DashboardPage() {
               <CardTitle className="text-base flex items-center">
                 <Filter className="mr-2 h-4 w-4" />
                 Filtros de Período
+                
               </CardTitle>
+              
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
@@ -617,11 +623,24 @@ export default function DashboardPage() {
                   Mes Actual
                 </Button>
               </div>
-              <div className="mt-2 text-xs text-gray-600">
+              
+             <div className="mt-2 text-xs text-gray-600 flex items-center w-full">
+              <span>
                 Período seleccionado:{" "}
                 {parametros?.fechaInicio ? formatDate(parametros.fechaInicio) : formatDate(fechaInicio)} -{" "}
                 {parametros?.fechaFin ? formatDate(parametros.fechaFin) : formatDate(fechaFin)}
-              </div>
+              </span>
+
+              {dashboardData && (
+                <Button onClick={exportDashboardToPDF} className="ml-auto bg-slate-900 hover:bg-slate-950" size="sm">
+                  <Download className="mr-2 h-4 w-4" />
+                  Exportar PDF
+                </Button>
+              )}
+            </div>
+
+
+
             </CardContent>
           </Card>
 

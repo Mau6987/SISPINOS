@@ -637,13 +637,23 @@ export default function ReportesPage() {
 
       <div className="container mx-auto px-3 py-4 pt-16 max-w-4xl">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3 mb-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">Sistema de Reportes</h1>
-            <p className="text-gray-600 text-sm">Distribuidora de Agua Los Pinos</p>
+         <div className="bg-white rounded-lg shadow-md border border-gray-300 mb-6 overflow-hidden">
+          <div className="px-6 py-4">
+            <div className="flex items-center gap-3 justify-center">
+              <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-purple-800 rounded-full flex items-center justify-center shadow-lg border border-gray-300">
+                <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path d="M9 17V11M15 17V13M12 17V15" strokeWidth="2"/>
+                  <path d="M12 3C10 3 6 7 6 12C6 16 9 20 12 20C15 20 18 16 18 12C18 7 14 3 12 3Z" strokeWidth="2"/>
+                  <path d="M12 7V9" strokeWidth="2"/>
+                  <path d="M19 3L21 5" strokeWidth="2"/>
+                  <path d="M5 5L3 3" strokeWidth="2"/>
+                </svg>
+              </div>
+              <h1 className="text-3xl font-bold text-black tracking-tight">Sistema de Reportes</h1>
+            </div>
           </div>
+          <div className="h-1 bg-gradient-to-r from-purple-600 to-purple-800"></div>
         </div>
-
         {showReportForm ? (
           <Card className="shadow-lg border-2 border-gray-300 rounded-lg">
             <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-800 text-white pb-3">

@@ -486,9 +486,21 @@ export default function PagosOffline() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 mt-16">
           <Toaster />
 
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-bold">Gestión de Pagos de Carga de Agua</h1>
-            <OfflineIndicator />
+           <div className="bg-white rounded-lg shadow-md border border-gray-300 mb-6 overflow-hidden">
+            <div className="px-6 py-4">
+              <div className="flex items-center gap-3 justify-center">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-800 rounded-full flex items-center justify-center shadow-lg border border-gray-300">
+                  <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M12 3C10 3 6 7 6 12C6 16 9 20 12 20C15 20 18 16 18 12C18 7 14 3 12 3Z" strokeWidth="2"/>
+                    <path d="M8 12H16" strokeWidth="2"/>
+                    <path d="M12 8V16" strokeWidth="2"/>
+                    <path d="M17 8H19C20.1046 8 21 8.89543 21 10V14C21 15.1046 20.1046 16 19 16H17" strokeWidth="2"/>
+                  </svg>
+                </div>
+                <h1 className="text-3xl font-bold text-black tracking-tight">Gestión de Pagos de Carga de Agua</h1>
+              </div>
+            </div>
+            <div className="h-1 bg-gradient-to-r from-blue-600 to-blue-800"></div>
           </div>
 
           <InstallPrompt />

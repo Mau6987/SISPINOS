@@ -470,10 +470,42 @@ export default function PreciosOffline() {
         )}
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-20">
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-bold text-center">Gestión de Precios de Carga de Agua</h1>
-            <OfflineIndicator />
+          
+         <div className="bg-white rounded-lg shadow-md border border-gray-300 mb-6 overflow-hidden">
+      <div className="px-6 py-4">
+        <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
+          <div className="text-center flex items-center gap-3">
+            <div className="w-12 h-12 bg-gradient-to-br from-blue-700 to-blue-900 rounded-full flex items-center justify-center shadow-lg border border-gray-300">
+              <svg 
+                className="h-6 w-6 text-white" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor"
+              >
+                {/* Gota de agua */}
+                <path 
+                  d="M12 3C10 3 6 7 6 12C6 16 9 20 12 20C15 20 18 16 18 12C18 7 14 3 12 3Z" 
+                  strokeWidth="1.5"
+                />
+                {/* Símbolo de dinero */}
+                <path 
+                  d="M12 8V7M12 12V11M12 17V16" 
+                  strokeWidth="1.5"
+                />
+                <path 
+                  d="M15 9.5C15 8.119 13.657 7 12 7C10.343 7 9 8.119 9 9.5C9 10.881 10.343 12 12 12C13.657 12 15 13.119 15 14.5C15 15.881 13.657 17 12 17C10.343 17 9 15.881 9 14.5" 
+                  strokeWidth="1.5"
+                />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-black mb-0 tracking-tight">Gestión del precio de las cargas de agua</h1>
+            </div>
           </div>
+        </div>
+      </div>
+      <div className="h-1 bg-gradient-to-r from-blue-700 to-blue-900"></div>
+    </div>
 
           <InstallPrompt />
           <SyncManagerEnhanced onSync={fetchPrecios} />

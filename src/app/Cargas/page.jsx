@@ -432,10 +432,49 @@ export default function WaterChargesOffline() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 mt-16">
           <Toaster />
 
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-bold">Gestión de Cargas de Agua</h1>
-            <OfflineIndicator />
+         <div className="bg-white rounded-lg shadow-md border border-gray-300 mb-6 overflow-hidden">
+      <div className="px-6 py-4">
+        <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
+          <div className="text-center flex items-center gap-3">
+            <div className="w-12 h-12 bg-gradient-to-br from-blue-700 to-blue-900 rounded-full flex items-center justify-center shadow-lg border border-gray-300">
+              <svg 
+                className="h-6 w-6 text-white" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor"
+              >
+                {/* Gota de agua principal */}
+                <path 
+                  d="M12 3C10 3 6 7 6 12C6 16 9 20 12 20C15 20 18 16 18 12C18 7 14 3 12 3Z" 
+                  strokeWidth="1.5"
+                />
+                {/* Líneas de flujo/carga */}
+                <path 
+                  d="M12 7L12 10" 
+                  strokeWidth="1.5"
+                />
+                <path 
+                  d="M10 9L14 9" 
+                  strokeWidth="1.5"
+                />
+                <path 
+                  d="M9 12L15 12" 
+                  strokeWidth="1.5"
+                />
+                <path 
+                  d="M8 15L16 15" 
+                  strokeWidth="1.5"
+                />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-black mb-0 tracking-tight">Gestión de Cargas de Agua</h1>
+            </div>
           </div>
+        </div>
+      </div>
+      <div className="h-1 bg-gradient-to-r from-blue-700 to-blue-900"></div>
+    </div>
 
           <InstallPrompt />
           <SyncManagerEnhanced onSync={fetchWaterCharges} />

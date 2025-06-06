@@ -243,12 +243,14 @@ export default function ProfilePage() {
 
   return (
     <NetworkStatusHandler onOffline={() => console.log("Modo offline activado")} onOnline={() => fetchProfile()}>
-      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 py-20 px-4">
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 pt-28 pb-20 px-4">
         <div className="max-w-5xl mx-auto">
-          <div className="mb-8 text-center">
-            <h1 className="text-3xl font-bold text-gray-800">Mi Perfil</h1>
-            <p className="text-gray-600 mt-2">Gestiona tu información personal</p>
-            <div className="mt-4 flex justify-center">
+          <div className="mb-12">
+            <div className="bg-gradient-to-r from-blue-600 to-blue-800 p-8 rounded-lg shadow-lg text-center mb-6">
+              <h1 className="text-4xl font-bold text-white mb-2">Mi Perfil</h1>
+              <p className="text-blue-100 text-lg">Gestiona tu información personal</p>
+            </div>
+            <div className="flex justify-center">
               <OfflineIndicator />
             </div>
           </div>

@@ -41,7 +41,6 @@ export default function Page() {
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#1a3a5f] to-[#0f2942]">
       
       <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-lg">
-        
         {/* Logo */}
         <div className="flex justify-center mb-6">
           <Image src="/logo3.png" alt="Logo" width={120} height={120} />

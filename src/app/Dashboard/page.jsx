@@ -225,7 +225,7 @@ export default function DashboardPage() {
 
     doc.setFontSize(6)
     doc.setFont("helvetica", "normal")
-    doc.text("Dashboard Ejecutivo", pageWidth / 2, 18, { align: "center" })
+    doc.text("Dashboard ", pageWidth / 2, 18, { align: "center" })
 
     // Línea separadora
     doc.setDrawColor(...azulOscuro)
@@ -236,7 +236,7 @@ export default function DashboardPage() {
     doc.setFontSize(8)
     doc.setFont("helvetica", "bold")
     doc.setTextColor(...negro)
-    doc.text("REPORTE EJECUTIVO", pageWidth / 2, 30, { align: "center" })
+    doc.text("REPORTE ", pageWidth / 2, 30, { align: "center" })
 
     // Información del período en formato compacto
     let yPos = 38
@@ -471,7 +471,7 @@ export default function DashboardPage() {
     doc.setFontSize(4)
     doc.text("Este dashboard es generado automáticamente por el sistema.", pageWidth / 2, yPos, { align: "center" })
     doc.text("Distribuidora de Agua Los Pinos", pageWidth / 2, yPos + 3, { align: "center" })
-    doc.text(`Dashboard Ejecutivo - ${currentDate}`, pageWidth / 2, yPos + 6, { align: "center" })
+    doc.text(`Dashboard  - ${currentDate}`, pageWidth / 2, yPos + 6, { align: "center" })
 
     doc.save(`dashboard_ejecutivo_${format(new Date(), "yyyy-MM-dd")}.pdf`)
   }
@@ -548,7 +548,7 @@ export default function DashboardPage() {
                       <path d="M12 19V21" strokeWidth="2"/>
                     </svg>
                   </div>
-                  <h1 className="text-3xl font-bold text-black tracking-tight">Dashboard Ejecutivo</h1>
+                  <h1 className="text-3xl font-bold text-black tracking-tight">Dashboard </h1>
                  
                 </div>
                 
@@ -638,9 +638,6 @@ export default function DashboardPage() {
                 </Button>
               )}
             </div>
-
-
-
             </CardContent>
           </Card>
 

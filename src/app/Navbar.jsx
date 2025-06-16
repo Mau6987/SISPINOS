@@ -1,5 +1,5 @@
 "use client"
-
+import LogoWithText from "@/components/logo"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Home, Package, Users, CreditCard, User, LogOut, Menu, ChevronDown, BarChart3, TrendingUp } from "lucide-react"
@@ -10,7 +10,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "../components/components/ui/dropdown-menu"
+} from "../components/components/ui/dropdown-menu"  
 
 import { Sheet, SheetContent, SheetTrigger } from "../components/components/ui/sheet"
 
@@ -156,6 +156,8 @@ export default function Navbar() {
               Los Pinos
             </Link>
           </div>
+           <Link href="/Home" className="flex items-center">
+          </Link>
 
           <div className="hidden md:flex space-x-1">
             <NavItems />

@@ -70,6 +70,7 @@ export default function ProfilePage() {
     if (userId && token) {
       fetchProfile()
     }
+    
   }, [userId, token])
 
   const fetchProfile = async () => {
@@ -279,6 +280,7 @@ export default function ProfilePage() {
                   </div>
                   <div className="text-center mt-4">
                     <h2 className="text-xl font-bold text-gray-800">{profile.nombre}</h2>
+                    {localStorage.setItem("userName", profile.nombre)}
                     <p className="text-gray-500">@{profile.username}</p>
                   </div>
 

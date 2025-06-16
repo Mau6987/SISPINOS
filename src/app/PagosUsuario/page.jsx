@@ -759,7 +759,7 @@ export default function UsuarioDetalles() {
     </div>
     <div className="h-1 bg-gradient-to-r from-green-600 to-green-800"></div>
   </div>
-<LogoWithText logoSize="h-20 w-20" textSize="text-1l" />
+
 
 
         <InstallPrompt />

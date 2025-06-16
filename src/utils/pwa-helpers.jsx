@@ -1,84 +1,406 @@
 "use client"
+import { openDB } from "idb"
+import { useState, useEffect } from "react"
+import { Wifi, WifiOff, BoxIcon as Button, RefreshCw } from "lucide-react"
 
 /**
  * Utilidades para trabajar con características de PWA
  */
 
-const DB_NAME = "pwa-app-db"
-const DB_VERSION = 3 // Incrementamos la versión para forzar recreación
-
-let dbInstance = null
+const DB_NAME = "agua-pinos-pwa"
+const DB_VERSION = 1 // Incrementamos la versión para forzar recreación
 
 /**
  * Inicializa la base de datos con manejo robusto de errores
  */
-const initDB = () => {
-  return new Promise((resolve, reject) => {
-    if (dbInstance) {
-      resolve(dbInstance)
-      return
+export const initDB = async () => {
+  return openDB(DB_NAME, DB_VERSION, {
+    upgrade(db) {
+      // Almacén para cargas de agua
+      if (!db.objectStoreNames.contains("cargas")) {
+        db.createObjectStore("cargas", { keyPath: "id" })
+      }
+
+      // Almacén para pagos
+      if (!db.objectStoreNames.contains("pagos")) {
+        db.createObjectStore("pagos", { keyPath: "id" })
+      }
+
+      // Almacén para conductores
+      if (!db.objectStoreNames.contains("conductores")) {
+        db.createObjectStore("conductores", { keyPath: "id" })
+      }
+
+      // Almacén para usuarios
+      if (!db.objectStoreNames.contains("usuarios")) {
+        db.createObjectStore("usuarios", { keyPath: "id" })
+      }
+
+      // Almacén para datos del dashboard
+      if (!db.objectStoreNames.contains("dashboard")) {
+        db.createObjectStore("dashboard", { keyPath: "id" })
+      }
+
+      // Almacén para perfil de usuario
+      if (!db.objectStoreNames.contains("perfil")) {
+        db.createObjectStore("perfil", { keyPath: "id" })
+      }
+
+      // Cola de sincronización para operaciones pendientes
+      if (!db.objectStoreNames.contains("syncQueue")) {
+        db.createObjectStore("syncQueue", { keyPath: "id", autoIncrement: true })
+      }
+
+      // Almacén para solicitudes de sincronización
+      if (!db.objectStoreNames.contains("syncRequests")) {
+        db.createObjectStore("syncRequests", { keyPath: "id" })
+      }
+    },
+  })
+}
+
+/**
+ * Guarda datos en IndexedDB para uso offline
+ */
+export async function saveToIndexedDB(storeName, data) {
+  try {
+    const db = await initDB()
+    const tx = db.transaction(storeName, "readwrite")
+    const store = tx.objectStore(storeName)
+    await store.put(data)
+    await tx.done
+    return true
+  } catch (error) {
+    console.error(`Error al guardar en ${storeName}:`, error)
+    return false
+  }
+}
+
+/**
+ * Recupera datos de IndexedDB
+ */
+export async function getFromIndexedDB(storeName, id) {
+  try {
+    const db = await initDB()
+    const tx = db.transaction(storeName, "readonly")
+    const store = tx.objectStore(storeName)
+    const result = await store.get(id)
+    await tx.done
+    return result
+  } catch (error) {
+    console.error(`Error al obtener de ${storeName}:`, error)
+    return null
+  }
+}
+
+/**
+ * Obtener todos los datos de un almacén
+ */
+export const getAllFromIndexedDB = async (storeName) => {
+  try {
+    const db = await initDB()
+    const tx = db.transaction(storeName, "readonly")
+    const store = tx.objectStore(storeName)
+    const result = await store.getAll()
+    await tx.done
+    return result
+  } catch (error) {
+    console.error(`Error al obtener todos de ${storeName}:`, error)
+    return []
+  }
+}
+
+/**
+ * Elimina datos de IndexedDB
+ */
+export async function removeFromIndexedDB(storeName, id) {
+  try {
+    const db = await initDB()
+    const tx = db.transaction(storeName, "readwrite")
+    const store = tx.objectStore(storeName)
+    await store.delete(id)
+    await tx.done
+    return true
+  } catch (error) {
+    console.error(`Error al eliminar de ${storeName}:`, error)
+    return false
+  }
+}
+
+/**
+ * Añadir operación a la cola de sincronización
+ */
+export const addToSyncQueue = async (operation) => {
+  try {
+    const db = await initDB()
+    const tx = db.transaction("syncQueue", "readwrite")
+    const store = tx.objectStore("syncQueue")
+
+    // Añadir timestamp y estado
+    const syncOperation = {
+      ...operation,
+      timestamp: Date.now(),
+      status: "pending",
+      retries: 0,
     }
 
-    const request = indexedDB.open(DB_NAME, DB_VERSION)
+    await store.add(syncOperation)
+    await tx.done
+    return true
+  } catch (error) {
+    console.error("Error al añadir a la cola de sincronización:", error)
+    return false
+  }
+}
 
-    request.onerror = () => {
-      console.error("Error al abrir IndexedDB:", request.error)
-      reject(request.error)
-    }
+/**
+ * Obtener operaciones pendientes de la cola de sincronización
+ */
+export const getPendingSyncOperations = async () => {
+  try {
+    const db = await initDB()
+    const tx = db.transaction("syncQueue", "readonly")
+    const store = tx.objectStore("syncQueue")
+    const operations = await store.getAll()
+    await tx.done
+    return operations.filter((op) => op.status === "pending")
+  } catch (error) {
+    console.error("Error al obtener operaciones pendientes:", error)
+    return []
+  }
+}
 
-    request.onupgradeneeded = (event) => {
-      const db = event.target.result
-      console.log("Actualizando estructura de IndexedDB...")
+/**
+ * Actualizar estado de una operación en la cola de sincronización
+ */
+export const updateSyncOperation = async (id, updates) => {
+  try {
+    const db = await initDB()
+    const tx = db.transaction("syncQueue", "readwrite")
+    const store = tx.objectStore("syncQueue")
 
-      // Eliminar stores existentes si existen (para recrear)
-      const existingStores = Array.from(db.objectStoreNames)
-      existingStores.forEach((storeName) => {
-        if (db.objectStoreNames.contains(storeName)) {
-          db.deleteObjectStore(storeName)
-          console.log(`Object store '${storeName}' eliminado`)
-        }
-      })
+    const operation = await store.get(id)
+    if (!operation) return false
 
-      // Crear object stores necesarios
-      const storeNames = ["users", "propietarios", "syncRequests", "cache"]
+    const updatedOperation = { ...operation, ...updates }
+    await store.put(updatedOperation)
+    await tx.done
+    return true
+  } catch (error) {
+    console.error("Error al actualizar operación de sincronización:", error)
+    return false
+  }
+}
 
-      storeNames.forEach((storeName) => {
-        const store = db.createObjectStore(storeName, { keyPath: "id" })
-        console.log(`Object store '${storeName}' creado`)
+/**
+ * Limpiar operaciones completadas o fallidas (más antiguas que maxAge en ms)
+ */
+export const cleanupSyncQueue = async (maxAge = 7 * 24 * 60 * 60 * 1000) => {
+  // 7 días por defecto
+  try {
+    const db = await initDB()
+    const tx = db.transaction("syncQueue", "readwrite")
+    const store = tx.objectStore("syncQueue")
 
-        // Crear índices específicos para syncRequests
-        if (storeName === "syncRequests") {
-          store.createIndex("timestamp", "timestamp", { unique: false })
-          store.createIndex("attempts", "attempts", { unique: false })
-          store.createIndex("endpoint", "endpoint", { unique: false })
-        }
+    const operations = await store.getAll()
+    const now = Date.now()
 
-        // Crear índices para users
-        if (storeName === "users") {
-          store.createIndex("timestamp", "timestamp", { unique: false })
-        }
-
-        // Crear índices para propietarios
-        if (storeName === "propietarios") {
-          store.createIndex("timestamp", "timestamp", { unique: false })
-        }
-      })
-    }
-
-    request.onsuccess = () => {
-      dbInstance = request.result
-      console.log("IndexedDB inicializada correctamente con stores:", Array.from(dbInstance.objectStoreNames))
-      resolve(dbInstance)
-    }
-
-    request.onblocked = () => {
-      console.warn("IndexedDB bloqueada, cerrando conexiones existentes...")
-      if (dbInstance) {
-        dbInstance.close()
-        dbInstance = null
+    for (const op of operations) {
+      if (op.status !== "pending" && now - op.timestamp > maxAge) {
+        await store.delete(op.id)
       }
     }
+
+    await tx.done
+    return true
+  } catch (error) {
+    console.error("Error al limpiar cola de sincronización:", error)
+    return false
+  }
+}
+
+/**
+ * Verifica si hay conexión a internet
+ */
+export const isOnline = () => {
+  return navigator.onLine
+}
+
+/**
+ * Formatear fecha para mostrar
+ */
+export const formatDate = (dateString) => {
+  return new Date(dateString).toLocaleString("es-ES", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   })
+}
+
+/**
+ * Generar un ID único temporal para nuevos registros offline
+ */
+export const generateTempId = () => {
+  return `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+}
+
+/**
+ * Sincronizar datos con el servidor cuando hay conexión
+ */
+export const syncWithServer = async () => {
+  if (!isOnline()) return { success: false, message: "Sin conexión a internet" }
+
+  try {
+    const pendingOperations = await getPendingSyncOperations()
+
+    if (pendingOperations.length === 0) {
+      return { success: true, message: "No hay operaciones pendientes" }
+    }
+
+    let successCount = 0
+    let failCount = 0
+
+    for (const operation of pendingOperations) {
+      try {
+        // Procesar según el tipo de operación
+        switch (operation.type) {
+          case "CREATE_PAYMENT":
+            // Implementar lógica para crear pago en el servidor
+            await processPendingPayment(operation)
+            break
+          case "EXPORT_PDF":
+            // Implementar lógica para exportar PDF
+            await processPendingExport(operation)
+            break
+          case "UPDATE_PROFILE":
+            // Implementar lógica para actualizar perfil
+            await processPendingProfileUpdate(operation)
+            break
+          // Añadir más casos según sea necesario
+        }
+
+        // Marcar como completada
+        await updateSyncOperation(operation.id, { status: "completed", syncedAt: Date.now() })
+        successCount++
+      } catch (error) {
+        console.error(`Error al sincronizar operación ${operation.id}:`, error)
+
+        // Incrementar contador de reintentos
+        const retries = (operation.retries || 0) + 1
+        const status = retries >= 3 ? "failed" : "pending"
+
+        await updateSyncOperation(operation.id, {
+          status,
+          retries,
+          lastError: error.message,
+          lastAttempt: Date.now(),
+        })
+
+        failCount++
+      }
+    }
+
+    return {
+      success: successCount > 0,
+      message: `Sincronización completada: ${successCount} exitosas, ${failCount} fallidas`,
+    }
+  } catch (error) {
+    console.error("Error durante la sincronización:", error)
+    return { success: false, message: `Error durante la sincronización: ${error.message}` }
+  }
+}
+
+// Procesar pago pendiente
+const processPendingPayment = async (operation) => {
+  const { data } = operation
+
+  const response = await fetch("https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/pagoscargagua", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    },
+    body: JSON.stringify(data),
+  })
+
+  if (!response.ok) {
+    throw new Error(`Error al procesar pago: ${response.status}`)
+  }
+
+  return await response.json()
+}
+
+// Procesar exportación de PDF pendiente
+const processPendingExport = async (operation) => {
+  // Aquí implementaríamos la lógica para generar y descargar el PDF
+  // Como esto normalmente ocurre en el cliente, podríamos mostrar una notificación
+  return true
+}
+
+// Procesar actualización de perfil pendiente
+const processPendingProfileUpdate = async (operation) => {
+  const { data, userId } = operation
+
+  const response = await fetch(`https://zneeyt2ar7.execute-api.us-east-1.amazonaws.com/dev/perfil/${userId}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    },
+    body: JSON.stringify(data),
+  })
+
+  if (!response.ok) {
+    throw new Error(`Error al actualizar perfil: ${response.status}`)
+  }
+
+  return await response.json()
+}
+
+// Componente de estado de conexión PWA
+export const PWAStatusBar = ({ pendingOperations = 0, onSync }) => {
+  const [isConnected, setIsConnected] = useState(navigator.onLine)
+
+  useEffect(() => {
+    const handleOnline = () => setIsConnected(true)
+    const handleOffline = () => setIsConnected(false)
+
+    window.addEventListener("online", handleOnline)
+    window.addEventListener("offline", handleOffline)
+
+    return () => {
+      window.removeEventListener("online", handleOnline)
+      window.removeEventListener("offline", handleOffline)
+    }
+  }, [])
+
+  return (
+    <div
+      className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm ${
+        isConnected ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+      }`}
+    >
+      {isConnected ? <Wifi className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
+      {isConnected ? "En línea" : "Sin conexión"}
+
+      {pendingOperations > 0 && (
+        <>
+          <span className="mx-1">•</span>
+          <span className="text-amber-700">
+            {pendingOperations} pendiente{pendingOperations !== 1 ? "s" : ""}
+          </span>
+          {isConnected && (
+            <Button variant="ghost" size="sm" className="h-6 px-2 py-0 ml-1" onClick={onSync}>
+              <RefreshCw className="h-3 w-3 mr-1" />
+              Sincronizar
+            </Button>
+          )}
+        </>
+      )}
+    </div>
+  )
 }
 
 /**
@@ -90,148 +412,6 @@ const storeExists = async (storeName) => {
     return db.objectStoreNames.contains(storeName)
   } catch (error) {
     console.error("Error verificando store:", error)
-    return false
-  }
-}
-
-/**
- * Guarda datos en IndexedDB para uso offline
- */
-export async function saveToIndexedDB(storeName, data, key) {
-  try {
-    const db = await initDB()
-
-    // Verificar que el store existe
-    if (!db.objectStoreNames.contains(storeName)) {
-      console.error(`Store '${storeName}' no existe en la base de datos`)
-      return false
-    }
-
-    return new Promise((resolve, reject) => {
-      try {
-        const transaction = db.transaction(storeName, "readwrite")
-        const store = transaction.objectStore(storeName)
-
-        const addRequest = store.put(data)
-
-        addRequest.onsuccess = () => {
-          console.log(`Datos guardados en IndexedDB store: ${storeName}`)
-          resolve(true)
-        }
-
-        addRequest.onerror = () => {
-          console.error(`Error al guardar en store ${storeName}:`, addRequest.error)
-          reject(addRequest.error)
-        }
-
-        transaction.onerror = () => {
-          console.error(`Error en transacción para store ${storeName}:`, transaction.error)
-          reject(transaction.error)
-        }
-      } catch (error) {
-        console.error(`Error creando transacción para ${storeName}:`, error)
-        reject(error)
-      }
-    })
-  } catch (error) {
-    console.error(`Error al guardar en IndexedDB (${storeName}):`, error)
-    return false
-  }
-}
-
-/**
- * Recupera datos de IndexedDB
- */
-export async function getFromIndexedDB(storeName, key) {
-  try {
-    const db = await initDB()
-
-    // Verificar que el store existe
-    if (!db.objectStoreNames.contains(storeName)) {
-      console.error(`Store '${storeName}' no existe en la base de datos`)
-      return null
-    }
-
-    return new Promise((resolve, reject) => {
-      try {
-        const transaction = db.transaction(storeName, "readonly")
-        const store = transaction.objectStore(storeName)
-
-        let getRequest
-
-        if (key !== undefined) {
-          // Obtener un objeto específico
-          getRequest = store.get(key)
-        } else {
-          // Obtener todos los objetos
-          getRequest = store.getAll()
-        }
-
-        getRequest.onsuccess = () => {
-          resolve(getRequest.result)
-        }
-
-        getRequest.onerror = () => {
-          console.error(`Error al recuperar de store ${storeName}:`, getRequest.error)
-          reject(getRequest.error)
-        }
-
-        transaction.onerror = () => {
-          console.error(`Error en transacción para store ${storeName}:`, transaction.error)
-          reject(transaction.error)
-        }
-      } catch (error) {
-        console.error(`Error creando transacción para ${storeName}:`, error)
-        reject(error)
-      }
-    })
-  } catch (error) {
-    console.error(`Error al acceder a IndexedDB (${storeName}):`, error)
-    return null
-  }
-}
-
-/**
- * Elimina datos de IndexedDB
- */
-export async function removeFromIndexedDB(storeName, key) {
-  try {
-    const db = await initDB()
-
-    // Verificar que el store existe
-    if (!db.objectStoreNames.contains(storeName)) {
-      console.error(`Store '${storeName}' no existe en la base de datos`)
-      return false
-    }
-
-    return new Promise((resolve, reject) => {
-      try {
-        const transaction = db.transaction(storeName, "readwrite")
-        const store = transaction.objectStore(storeName)
-
-        const deleteRequest = store.delete(key)
-
-        deleteRequest.onsuccess = () => {
-          console.log(`Datos eliminados de IndexedDB store: ${storeName}`)
-          resolve(true)
-        }
-
-        deleteRequest.onerror = () => {
-          console.error(`Error al eliminar de store ${storeName}:`, deleteRequest.error)
-          reject(deleteRequest.error)
-        }
-
-        transaction.onerror = () => {
-          console.error(`Error en transacción para store ${storeName}:`, transaction.error)
-          reject(transaction.error)
-        }
-      } catch (error) {
-        console.error(`Error creando transacción para ${storeName}:`, error)
-        reject(error)
-      }
-    })
-  } catch (error) {
-    console.error(`Error al eliminar de IndexedDB (${storeName}):`, error)
     return false
   }
 }
@@ -324,7 +504,7 @@ export async function processPendingSyncRequests() {
       return { processed: 0, failed: 0 }
     }
 
-    const pendingRequests = await getFromIndexedDB("syncRequests")
+    const pendingRequests = await getAllFromIndexedDB("syncRequests")
 
     if (!pendingRequests || pendingRequests.length === 0) {
       console.log("No hay solicitudes pendientes para procesar")
@@ -382,7 +562,7 @@ export async function processPendingSyncRequests() {
     }
 
     // Actualizar contador de solicitudes pendientes
-    const remainingRequests = await getFromIndexedDB("syncRequests")
+    const remainingRequests = await getAllFromIndexedDB("syncRequests")
     const remainingCount = remainingRequests ? remainingRequests.length : 0
     localStorage.setItem("pendingRequestsCount", remainingCount.toString())
 
@@ -471,7 +651,17 @@ export async function isBackgroundSyncSupported() {
 export async function clearIndexedDB() {
   try {
     const db = await initDB()
-    const storeNames = ["users", "propietarios", "syncRequests", "cache"]
+    const storeNames = [
+      "users",
+      "propietarios",
+      "syncRequests",
+      "cache",
+      "cargas",
+      "pagos",
+      "conductores",
+      "dashboard",
+      "perfil",
+    ]
 
     return new Promise((resolve, reject) => {
       try {
